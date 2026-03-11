@@ -5,6 +5,7 @@ import LoginForm from './components/auth/LoginForm'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import KanbanBoard from './components/boards/KanbanBoard'
 import BoardSelector from './components/boards/BoardSelector'
+import DashboardView from './components/dashboard/DashboardView'
 import PublicRequestForm from './components/requests/PublicRequestForm'
 import RequestTracking from './components/requests/RequestTracking'
 import RequestInbox from './components/requests/RequestInbox'
@@ -12,7 +13,7 @@ import RequestInbox from './components/requests/RequestInbox'
 function Dashboard() {
   const { user, signOut } = useAuth()
   const [currentBoard, setCurrentBoard] = useState<'development' | 'administrative'>('development')
-  const [currentTab, setCurrentTab] = useState<'boards' | 'requests'>('boards')
+  const [currentTab, setCurrentTab] = useState<'dashboard' | 'boards' | 'requests'>('dashboard')
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -27,6 +28,16 @@ function Dashboard() {
             <div className="flex items-center gap-6">
               {/* Tab Selector */}
               <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
+                <button
+                  onClick={() => setCurrentTab('dashboard')}
+                  className={`px-4 py-2 rounded-md font-medium text-sm transition ${
+                    currentTab === 'dashboard'
+                      ? 'bg-white text-primary shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  📈 Dashboard
+                </button>
                 <button
                   onClick={() => setCurrentTab('boards')}
                   className={`px-4 py-2 rounded-md font-medium text-sm transition ${
@@ -77,9 +88,10 @@ function Dashboard() {
 
       {/* Main Content */}
       <div className="max-w-[1600px] mx-auto px-6 py-6">
-        {currentTab === 'boards' ? (
+        {currentTab === 'dashboard' && <DashboardView />}
+
+        {currentTab === 'boards' && (
           <>
-            {/* Board Title */}
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900">
                 {currentBoard === 'development' ? '💻 Board Development' : '📋 Board Administrative'}
@@ -88,13 +100,12 @@ function Dashboard() {
                 Arrastra y suelta los proyectos entre las columnas
               </p>
             </div>
-
-            {/* Kanban Board */}
             <KanbanBoard boardType={currentBoard} />
           </>
-        ) : (
+        )}
+
+        {currentTab === 'requests' && (
           <>
-            {/* Requests Title */}
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900">
                 📬 Inbox de Solicitudes
@@ -103,8 +114,6 @@ function Dashboard() {
                 Revisa y gestiona las solicitudes pendientes
               </p>
             </div>
-
-            {/* Request Inbox */}
             <RequestInbox />
           </>
         )}

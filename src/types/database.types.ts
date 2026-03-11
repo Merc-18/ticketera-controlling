@@ -25,6 +25,7 @@ export interface Request {
   data_system_involved?: string;
   description: string;
   observations?: string;
+  request_date?: string;
   requested_date?: string;
   created_at: string;
   needs_code: boolean;
@@ -44,6 +45,8 @@ export interface Project {
   status: 'active' | 'completed' | 'archived';
   estimated_hours?: number;
   actual_hours?: number;
+  start_date?: string;
+  due_date?: string;
   is_blocked: boolean;
   blocked_reason?: string;
   blocked_since?: string;

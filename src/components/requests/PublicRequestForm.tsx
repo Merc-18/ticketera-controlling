@@ -1,39 +1,39 @@
 import { useState } from 'react'
 import { useRequests } from '../../hooks/useRequests'
 
-const AREAS = ['SAQ', 'DDC', 'QA', 'ATC', 'AASS']
+const AREAS = ['AASS', 'ATC', 'DDC', 'QA', 'SAQ']
 
 const SYSTEMS = [
-  'Power BI',
-  'Power Automate',
-  'Power Apps',
-  'Sharepoint',
   'BD (Access, Sql)',
   'Excel',
-  'Otro'
+  'Power Apps',
+  'Power Automate',
+  'Power BI',
+  'Sharepoint',
+  'Otro',
 ]
 
 const REQUEST_TYPES = {
   administrative: [
-    'Reporte',
     'Acceso / Permiso',
-    'Mejora de proceso',
     'Automatización',
     'Capacitación',
-    'Otro'
+    'Mejora de proceso',
+    'Reporte',
+    'Otro',
   ],
   development: [
     'Automatización con IA',
-    'Digitalización de proceso',
-    'Integración de sistemas',
-    'Feature nueva',
     'Bug / Error',
+    'Digitalización de proceso',
+    'Feature nueva',
+    'Integración de sistemas',
     'Mejora técnica',
-    'Otro'
-  ]
+    'Otro',
+  ],
 }
 
-const ORIGINS = ['Interno', 'Externo', 'Regulatorio', 'Cliente', 'Otro']
+const ORIGINS = ['Cliente', 'Externo', 'Interno', 'Regulatorio', 'Otro']
 
 export default function PublicRequestForm() {
   const { createRequest } = useRequests()

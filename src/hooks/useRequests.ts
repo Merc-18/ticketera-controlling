@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Request } from '../types/database.types'
+import { DEFAULT_CHECKLIST } from '../lib/checklist-defaults'
 
 export function useRequests() {
   const [requests, setRequests] = useState<Request[]>([])
@@ -29,9 +30,15 @@ export function useRequests() {
 
   const createRequest = async (requestData: Partial<Request>) => {
     try {
+      // Convert empty date strings to null to avoid DB type errors
+      const cleanedData = {
+        ...requestData,
+        request_date: requestData.request_date || null,
+        requested_date: requestData.requested_date || null,
+      }
       const { data, error } = await supabase
         .from('requests')
-        .insert([requestData])
+        .insert([cleanedData])
         .select()
         .single()
 
@@ -47,6 +54,10 @@ export function useRequests() {
 const approveRequest = async (requestId: string, projectData: {
   project_type: 'development' | 'administrative' | 'dual'
   priority: 'low' | 'medium' | 'high' | 'urgent'
+  title?: string
+  estimated_hours?: number
+  start_date?: string
+  due_date?: string
 }) => {
   try {
     // 1. Obtener el request
@@ -63,13 +74,16 @@ const approveRequest = async (requestId: string, projectData: {
       .from('projects')
       .insert([{
         request_id: requestId,
-        title: `${request.request_type} - ${request.requester_area}`,
+        title: projectData.title?.trim() || `${request.request_type} - ${request.requester_area}`,
         description: request.description,
         project_type: projectData.project_type,
         priority: projectData.priority,
         status: 'active',
         is_blocked: false,
-        tag_ids: []
+        tag_ids: [],
+        estimated_hours: projectData.estimated_hours || null,
+        start_date: projectData.start_date || null,
+        due_date: projectData.due_date || null,
       }])
       .select()
       .single()
@@ -97,11 +111,43 @@ const approveRequest = async (requestId: string, projectData: {
       })
     }
 
-    const { error: flowsError } = await supabase
+    const { data: createdFlows, error: flowsError } = await supabase
       .from('project_flows')
       .insert(flows)
+      .select()
 
     if (flowsError) throw flowsError
+
+    // 3b. Crear checklist items por defecto para cada flujo y fase
+    const checklistItems: {
+      project_flow_id: string
+      phase: string
+      description: string
+      completed: boolean
+      order_index: number
+    }[] = []
+
+    for (const flow of createdFlows || []) {
+      const flowDefaults = DEFAULT_CHECKLIST[flow.flow_type as 'development' | 'administrative'] || {}
+      for (const [phase, descriptions] of Object.entries(flowDefaults)) {
+        descriptions.forEach((description, idx) => {
+          checklistItems.push({
+            project_flow_id: flow.id,
+            phase,
+            description,
+            completed: false,
+            order_index: idx,
+          })
+        })
+      }
+    }
+
+    if (checklistItems.length > 0) {
+      const { error: checklistError } = await supabase
+        .from('checklist_items')
+        .insert(checklistItems)
+      if (checklistError) throw checklistError
+    }
 
     // 4. Actualizar el request como aprobado
     const { error: updateError } = await supabase

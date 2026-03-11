@@ -11,7 +11,11 @@ export default function RequestInbox() {
   const [actionLoading, setActionLoading] = useState(false)
   const [approveData, setApproveData] = useState({
     project_type: 'development' as 'development' | 'administrative' | 'dual',
-    priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent'
+    priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
+    title: '',
+    estimated_hours: '',
+    start_date: '',
+    due_date: '',
   })
 
   const pendingRequests = requests.filter(r => r.status === 'pending')
@@ -23,7 +27,12 @@ export default function RequestInbox() {
     
     setActionLoading(true)
     try {
-      await approveRequest(selectedRequest.id, approveData)
+      await approveRequest(selectedRequest.id, {
+        ...approveData,
+        estimated_hours: approveData.estimated_hours ? Number(approveData.estimated_hours) : undefined,
+        start_date: approveData.start_date || undefined,
+        due_date: approveData.due_date || undefined,
+      })
       setShowApproveModal(false)
       setSelectedRequest(null)
       alert('✅ Solicitud aprobada y proyecto creado')
@@ -116,6 +125,7 @@ export default function RequestInbox() {
                   onClick={(e) => {
                     e.stopPropagation()
                     setSelectedRequest(request)
+                    setApproveData(d => ({ ...d, title: `${request.request_type} - ${request.requester_area}` }))
                     setShowApproveModal(true)
                   }}
                   disabled={actionLoading}
@@ -235,7 +245,10 @@ export default function RequestInbox() {
             {selectedRequest.status === 'pending' && (
               <div className="mt-6 flex gap-3">
                 <button
-                  onClick={() => setShowApproveModal(true)}
+                  onClick={() => {
+                    setApproveData(d => ({ ...d, title: `${selectedRequest.request_type} - ${selectedRequest.requester_area}` }))
+                    setShowApproveModal(true)
+                  }}
                   disabled={actionLoading}
                   className="flex-1 bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition disabled:opacity-50"
                 >
@@ -302,59 +315,110 @@ export default function RequestInbox() {
       {/* Approve Modal */}
       {showApproveModal && selectedRequest && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Aprobar Solicitud</h2>
-            
-            <p className="text-gray-600 mb-4">
-              Solicitud: <span className="font-mono font-bold text-primary">{selectedRequest.request_number}</span>
-            </p>
+          <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">✅ Aprobar y Crear Proyecto</h2>
+              <button onClick={() => setShowApproveModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+            </div>
+
+            {/* Info solicitud */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-5 text-sm">
+              <p className="font-medium text-blue-900">{selectedRequest.request_number} · {selectedRequest.requester_name}</p>
+              <p className="text-blue-700">{selectedRequest.request_type} · {selectedRequest.requester_area}</p>
+            </div>
 
             <div className="space-y-4 mb-6">
+              {/* Título */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tipo de Proyecto <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Título del Proyecto <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={approveData.project_type}
-                  onChange={(e) => setApproveData({...approveData, project_type: e.target.value as any})}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                >
-                  <option value="development">💻 Development</option>
-                  <option value="administrative">📋 Administrative</option>
-                  <option value="dual">🔄 Dual Flow (Ambos)</option>
-                </select>
+                <input
+                  type="text"
+                  value={approveData.title}
+                  onChange={e => setApproveData(d => ({ ...d, title: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Nombre del proyecto"
+                />
               </div>
 
+              {/* Tipo + Prioridad */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo <span className="text-red-500">*</span></label>
+                  <select
+                    value={approveData.project_type}
+                    onChange={e => setApproveData(d => ({ ...d, project_type: e.target.value as any }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="development">💻 Development</option>
+                    <option value="administrative">📋 Administrative</option>
+                    <option value="dual">🔄 Dual Flow</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Prioridad <span className="text-red-500">*</span></label>
+                  <select
+                    value={approveData.priority}
+                    onChange={e => setApproveData(d => ({ ...d, priority: e.target.value as any }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="low">🟢 Baja</option>
+                    <option value="medium">🟡 Media</option>
+                    <option value="high">🟠 Alta</option>
+                    <option value="urgent">🔴 Urgente</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Horas estimadas */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Prioridad <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={approveData.priority}
-                  onChange={(e) => setApproveData({...approveData, priority: e.target.value as any})}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                >
-                  <option value="low">🟢 Baja</option>
-                  <option value="medium">🟡 Media</option>
-                  <option value="high">🟠 Alta</option>
-                  <option value="urgent">🔴 Urgente</option>
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Horas Estimadas</label>
+                <input
+                  type="number" min="0"
+                  value={approveData.estimated_hours}
+                  onChange={e => setApproveData(d => ({ ...d, estimated_hours: e.target.value }))}
+                  placeholder="ej. 40"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              {/* Fechas */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Inicio</label>
+                  <input
+                    type="date"
+                    value={approveData.start_date}
+                    onChange={e => setApproveData(d => ({ ...d, start_date: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Vencimiento</label>
+                  <input
+                    type="date"
+                    value={approveData.due_date}
+                    onChange={e => setApproveData(d => ({ ...d, due_date: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
               </div>
             </div>
 
             <div className="flex gap-3">
               <button
                 onClick={() => setShowApproveModal(false)}
-                className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition"
+                className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-lg font-semibold hover:bg-gray-200 transition text-sm"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleApprove}
-                disabled={actionLoading}
-                className="flex-1 bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition disabled:opacity-50"
+                disabled={actionLoading || !approveData.title.trim()}
+                className="flex-1 bg-green-500 text-white py-2.5 rounded-lg font-semibold hover:bg-green-600 transition disabled:opacity-50 text-sm"
               >
-                {actionLoading ? 'Aprobando...' : 'Confirmar Aprobación'}
+                {actionLoading ? 'Creando proyecto...' : '✅ Aprobar y crear proyecto'}
               </button>
             </div>
           </div>
