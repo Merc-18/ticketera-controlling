@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Request } from '../types/database.types'
 import { DEFAULT_CHECKLIST } from '../lib/checklist-defaults'
+import { getAutoTagIds } from '../lib/auto-tags'
 
 export function useRequests() {
   const [requests, setRequests] = useState<Request[]>([])
@@ -58,6 +59,8 @@ const approveRequest = async (requestId: string, projectData: {
   estimated_hours?: number
   start_date?: string
   due_date?: string
+  assigned_dev?: string    // UUID del usuario responsable del flujo development
+  assigned_admin?: string  // UUID del usuario responsable del flujo administrative
 }) => {
   try {
     // 1. Obtener el request
@@ -69,7 +72,14 @@ const approveRequest = async (requestId: string, projectData: {
 
     if (requestError) throw requestError
 
-    // 2. Crear el proyecto
+    // 2. Auto-tags based on priority and project type
+    // (area is already shown as a separate badge on the card)
+    const autoTagIds = await getAutoTagIds({
+      priority:    projectData.priority,
+      projectType: projectData.project_type,
+    })
+
+    // 3. Crear el proyecto
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .insert([{
@@ -80,7 +90,7 @@ const approveRequest = async (requestId: string, projectData: {
         priority: projectData.priority,
         status: 'active',
         is_blocked: false,
-        tag_ids: [],
+        tag_ids: autoTagIds,
         estimated_hours: projectData.estimated_hours || null,
         start_date: projectData.start_date || null,
         due_date: projectData.due_date || null,
@@ -98,16 +108,18 @@ const approveRequest = async (requestId: string, projectData: {
         project_id: project.id,
         flow_type: 'development',
         current_phase: 'backlog',
-        progress: 0
+        progress: 0,
+        assigned_to: projectData.assigned_dev || null,
       })
     }
-    
+
     if (projectData.project_type === 'administrative' || projectData.project_type === 'dual') {
       flows.push({
         project_id: project.id,
         flow_type: 'administrative',
         current_phase: 'backlog',
-        progress: 0
+        progress: 0,
+        assigned_to: projectData.assigned_admin || null,
       })
     }
 

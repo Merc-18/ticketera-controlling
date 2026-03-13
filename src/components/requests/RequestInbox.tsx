@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { useRequests } from '../../hooks/useRequests'
+import { useUsers } from '../../hooks/useUsers'
 import type { Request } from '../../types/database.types'
 
 export default function RequestInbox() {
   const { requests, loading, approveRequest, rejectRequest } = useRequests()
+  const { activeUsers } = useUsers()
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null)
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [showApproveModal, setShowApproveModal] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const [sameUser, setSameUser] = useState(false)
   const [approveData, setApproveData] = useState({
     project_type: 'development' as 'development' | 'administrative' | 'dual',
     priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
@@ -16,6 +19,8 @@ export default function RequestInbox() {
     estimated_hours: '',
     start_date: '',
     due_date: '',
+    assigned_dev: '',
+    assigned_admin: '',
   })
 
   const pendingRequests = requests.filter(r => r.status === 'pending')
@@ -24,7 +29,7 @@ export default function RequestInbox() {
 
   const handleApprove = async () => {
     if (!selectedRequest) return
-    
+
     setActionLoading(true)
     try {
       await approveRequest(selectedRequest.id, {
@@ -32,10 +37,14 @@ export default function RequestInbox() {
         estimated_hours: approveData.estimated_hours ? Number(approveData.estimated_hours) : undefined,
         start_date: approveData.start_date || undefined,
         due_date: approveData.due_date || undefined,
+        assigned_dev:   approveData.assigned_dev   || undefined,
+        assigned_admin: sameUser
+          ? (approveData.assigned_dev || undefined)
+          : (approveData.assigned_admin || undefined),
       })
       setShowApproveModal(false)
       setSelectedRequest(null)
-      alert('✅ Solicitud aprobada y proyecto creado')
+      setSameUser(false)
     } catch (err) {
       alert('Error al aprobar la solicitud')
     } finally {
@@ -404,6 +413,86 @@ export default function RequestInbox() {
                   />
                 </div>
               </div>
+
+              {/* ── Asignación de responsables ── */}
+              {activeUsers.length > 0 && (
+                <div className="border-t pt-4 space-y-3">
+                  <p className="text-sm font-semibold text-gray-700">👤 Asignación de responsables</p>
+
+                  {/* Development / único */}
+                  {(approveData.project_type === 'development' || approveData.project_type === 'dual') && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        {approveData.project_type === 'dual' ? '💻 Responsable Development' : '👤 Responsable'}
+                      </label>
+                      <select
+                        value={approveData.assigned_dev}
+                        onChange={e => setApproveData(d => ({ ...d, assigned_dev: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary bg-white"
+                      >
+                        <option value="">— Sin asignar —</option>
+                        {activeUsers.map(u => (
+                          <option key={u.id} value={u.id}>{u.full_name} ({u.role})</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Dual: mismo usuario toggle + admin dropdown */}
+                  {approveData.project_type === 'dual' && (
+                    <>
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={sameUser}
+                          onChange={e => setSameUser(e.target.checked)}
+                          className="w-4 h-4 accent-primary"
+                        />
+                        <span className="text-xs text-gray-600">Usar el mismo responsable para ambos flujos</span>
+                      </label>
+
+                      {!sameUser && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">📋 Responsable Administrative</label>
+                          <select
+                            value={approveData.assigned_admin}
+                            onChange={e => setApproveData(d => ({ ...d, assigned_admin: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary bg-white"
+                          >
+                            <option value="">— Sin asignar —</option>
+                            {activeUsers.map(u => (
+                              <option key={u.id} value={u.id}>{u.full_name} ({u.role})</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {sameUser && approveData.assigned_dev && (
+                        <p className="text-xs text-blue-600 bg-blue-50 rounded px-3 py-2">
+                          Ambos flujos asignados a: <strong>{activeUsers.find(u => u.id === approveData.assigned_dev)?.full_name}</strong>
+                        </p>
+                      )}
+                    </>
+                  )}
+
+                  {/* Administrative solo */}
+                  {approveData.project_type === 'administrative' && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">👤 Responsable</label>
+                      <select
+                        value={approveData.assigned_admin}
+                        onChange={e => setApproveData(d => ({ ...d, assigned_admin: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary bg-white"
+                      >
+                        <option value="">— Sin asignar —</option>
+                        {activeUsers.map(u => (
+                          <option key={u.id} value={u.id}>{u.full_name} ({u.role})</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3">

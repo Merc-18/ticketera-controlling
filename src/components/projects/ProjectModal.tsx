@@ -3,6 +3,9 @@ import type { Project, ProjectFlow } from '../../types/database.types'
 import CommentsSection from './CommentsSection'
 import ChecklistSection from './ChecklistSection'
 import ActivitySection from './ActivitySection'
+import { useUsers } from '../../hooks/useUsers'
+import { useTags } from '../../hooks/useTags'
+import { supabase } from '../../lib/supabase'
 
 interface Props {
   project: Project & { requests?: { requester_area: string; requester_name: string; request_type: string } | null }
@@ -11,6 +14,15 @@ interface Props {
   onUpdate?: () => void
   updateProject: (id: string, updates: Partial<Project>) => Promise<void>
   updateFlowDetails?: (flowId: string, updates: { progress?: number; assigned_to?: string }) => Promise<void>
+}
+
+const AVATAR_COLORS = ['bg-blue-500','bg-purple-500','bg-green-500','bg-orange-500','bg-pink-500','bg-teal-500','bg-indigo-500']
+function getAvatarColor(name: string) {
+  let h = 0; for (const c of name) h = c.charCodeAt(0) + ((h << 5) - h)
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
+}
+function getInitials(name: string) {
+  return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
 }
 
 const PHASE_LABELS: Record<string, string> = {
@@ -34,6 +46,8 @@ const PRIORITY_OPTIONS = [
   { value: 'urgent', label: 'Urgente', color: 'bg-red-100 text-red-800 border-red-200' },
 ]
 
+const KNOWN_AREAS = ['SAQ', 'DDC', 'QA', 'ATC', 'AASS']
+
 const AREA_COLORS: Record<string, string> = {
   SAQ:  'bg-blue-100 text-blue-800 border-blue-200',
   DDC:  'bg-purple-100 text-purple-800 border-purple-200',
@@ -43,6 +57,8 @@ const AREA_COLORS: Record<string, string> = {
 }
 
 export default function ProjectModal({ project, flows, onClose, onUpdate, updateProject, updateFlowDetails }: Props) {
+  const { activeUsers } = useUsers()
+  const { tags } = useTags()
   const [activeTab, setActiveTab] = useState<'details' | 'checklist' | 'comments' | 'activity'>('details')
   const [editMode, setEditMode] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -57,6 +73,8 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
     actual_hours: project.actual_hours ?? '',
     start_date: project.start_date ?? '',
     due_date: project.due_date ?? '',
+    tag_ids: project.tag_ids ?? [] as string[],
+    requester_area: project.requests?.requester_area ?? '',
   })
 
   const [blockReason, setBlockReason] = useState(project.blocked_reason ?? '')
@@ -67,6 +85,7 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
     () => Object.fromEntries(flows.map(f => [f.id, { progress: f.progress, assigned_to: f.assigned_to ?? '' }]))
   )
   const [savingFlow, setSavingFlow] = useState<string | null>(null)
+  const [reassigningFlow, setReassigningFlow] = useState<string | null>(null)
 
   // Ref para acceder al flowSaved más reciente sin cierre estale
   const flowSavedRef = useRef(flowSaved)
@@ -98,7 +117,7 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
   }, [flows])
 
   const priorityColor = PRIORITY_OPTIONS.find(p => p.value === project.priority)?.color ?? ''
-  const area = project.requests?.requester_area
+  const area = editMode ? editData.requester_area : (project.requests?.requester_area ?? '')
   const areaColor = area ? (AREA_COLORS[area] ?? 'bg-gray-100 text-gray-700 border-gray-200') : ''
   const requestType = project.requests?.request_type
 
@@ -113,7 +132,15 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
         actual_hours: editData.actual_hours !== '' ? Number(editData.actual_hours) : undefined,
         start_date: editData.start_date || undefined,
         due_date: editData.due_date || undefined,
+        tag_ids: editData.tag_ids,
       })
+      // Update requester_area on the linked request if it changed
+      if (project.request_id && editData.requester_area !== (project.requests?.requester_area ?? '')) {
+        await supabase
+          .from('requests')
+          .update({ requester_area: editData.requester_area })
+          .eq('id', project.request_id)
+      }
       setEditMode(false)
       onUpdate?.()
     } finally {
@@ -179,6 +206,7 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
       })
       // Actualizar el baseline para que isDirty vuelva a false
       setFlowSaved(prev => ({ ...prev, [flowId]: { ...edit } }))
+      setReassigningFlow(null)
       onUpdate?.()
     } finally {
       setSavingFlow(null)
@@ -215,11 +243,26 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
                 {project.priority.toUpperCase()}
               </span>
               {/* Área solicitante */}
-              {area && (
+              {editMode ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-500">📍</span>
+                  <select
+                    value={editData.requester_area}
+                    onChange={e => setEditData(prev => ({ ...prev, requester_area: e.target.value }))}
+                    className="px-2 py-0.5 rounded-full text-xs font-medium border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                  >
+                    <option value="">— Sin área —</option>
+                    {KNOWN_AREAS.map(a => <option key={a} value={a}>{a}</option>)}
+                    {editData.requester_area && !KNOWN_AREAS.includes(editData.requester_area) && (
+                      <option value={editData.requester_area}>{editData.requester_area}</option>
+                    )}
+                  </select>
+                </div>
+              ) : area ? (
                 <span className={`px-3 py-1 rounded-full text-xs font-medium border ${areaColor}`}>
                   📍 {area}
                 </span>
-              )}
+              ) : null}
               {/* Solicitante */}
               {requestType && (
                 <span className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 border border-indigo-200">
@@ -469,6 +512,54 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
                 </div>
               ) : null}
 
+              {/* Etiquetas / Tags */}
+              {tags.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-2">🏷️ Etiquetas</h3>
+                  {editMode ? (
+                    <div className="flex flex-wrap gap-2">
+                      {tags.map(tag => {
+                        const selected = editData.tag_ids.includes(tag.id)
+                        return (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => setEditData(prev => ({
+                              ...prev,
+                              tag_ids: selected
+                                ? prev.tag_ids.filter(id => id !== tag.id)
+                                : [...prev.tag_ids, tag.id]
+                            }))}
+                            className={`px-2.5 py-1 rounded-full text-xs font-medium border-2 transition ${
+                              selected ? 'text-white border-transparent' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400'
+                            }`}
+                            style={selected ? { backgroundColor: tag.color, borderColor: tag.color } : {}}
+                          >
+                            {selected ? '✓ ' : ''}{tag.name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {(project.tag_ids ?? []).length === 0 ? (
+                        <p className="text-sm text-gray-400 italic">Sin etiquetas</p>
+                      ) : (
+                        tags.filter(t => (project.tag_ids ?? []).includes(t.id)).map(tag => (
+                          <span
+                            key={tag.id}
+                            className="px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                            style={{ backgroundColor: tag.color }}
+                          >
+                            {tag.name}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Razón del bloqueo (solo lectura) */}
               {project.is_blocked && project.blocked_reason && (
                 <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
@@ -492,6 +583,7 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
                     const fe = flowEdits[flow.id] ?? { progress: flow.progress, assigned_to: flow.assigned_to ?? '' }
                     const saved = flowSaved[flow.id] ?? { progress: flow.progress, assigned_to: flow.assigned_to ?? '' }
                     const isDirty = fe.progress !== saved.progress || fe.assigned_to.trim() !== saved.assigned_to.trim()
+                    const assignedUser = fe.assigned_to ? activeUsers.find(u => u.id === fe.assigned_to) ?? null : null
                     return (
                       <div key={flow.id} className="bg-gray-50 rounded-lg p-4 border space-y-3">
                         <div className="flex items-center justify-between">
@@ -523,17 +615,51 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
 
                         {/* Assigned to */}
                         <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Asignado a</label>
-                          <input
-                            type="text"
-                            value={fe.assigned_to}
-                            onChange={e => setFlowEdits(prev => ({
-                              ...prev,
-                              [flow.id]: { ...prev[flow.id], assigned_to: e.target.value }
-                            }))}
-                            placeholder="Nombre del responsable..."
-                            className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                          />
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-xs font-medium text-gray-500">Responsable</label>
+                            {updateFlowDetails && (
+                              <button
+                                onClick={() => setReassigningFlow(reassigningFlow === flow.id ? null : flow.id)}
+                                className="text-xs text-primary hover:underline"
+                              >
+                                {reassigningFlow === flow.id ? 'Cancelar' : '✏️ Reasignar'}
+                              </button>
+                            )}
+                          </div>
+                          {reassigningFlow === flow.id ? (
+                            <select
+                              value={fe.assigned_to}
+                              onChange={e => setFlowEdits(prev => ({
+                                ...prev,
+                                [flow.id]: { ...prev[flow.id], assigned_to: e.target.value }
+                              }))}
+                              className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                            >
+                              <option value="">— Sin asignar —</option>
+                              {activeUsers.map(u => (
+                                <option key={u.id} value={u.id}>
+                                  {u.full_name} ({u.role})
+                                </option>
+                              ))}
+                              {fe.assigned_to && !activeUsers.some(u => u.id === fe.assigned_to) && (
+                                <option value={fe.assigned_to}>Usuario no disponible</option>
+                              )}
+                            </select>
+                          ) : assignedUser ? (
+                            <div className="flex items-center gap-2">
+                              <div className={`w-7 h-7 rounded-full ${getAvatarColor(assignedUser.full_name)} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
+                                {getInitials(assignedUser.full_name)}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-800">{assignedUser.full_name}</p>
+                                <p className="text-xs text-gray-400">{assignedUser.role}</p>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-400 italic">
+                              {fe.assigned_to ? 'Usuario no disponible' : 'Sin asignar'}
+                            </p>
+                          )}
                         </div>
 
                         {/* Guardar flujo */}

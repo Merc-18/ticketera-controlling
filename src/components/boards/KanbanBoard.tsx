@@ -7,7 +7,11 @@ import GanttView from './GanttView'
 import ProjectModal from '../projects/ProjectModal'
 import NewProjectModal from '../projects/NewProjectModal'
 import { useProjects } from '../../hooks/useProjects'
-import type { ProjectFlow } from '../../types/database.types'
+import { useUsers } from '../../hooks/useUsers'
+import { useAuth } from '../../hooks/useAuth'
+import { useTags } from '../../hooks/useTags'
+import type { ProjectFlow, User } from '../../types/database.types'
+
 
 type BoardType = 'development' | 'administrative'
 type ViewMode  = 'kanban' | 'table' | 'gantt'
@@ -58,10 +62,15 @@ const VIEW_MODES: { value: ViewMode; label: string; icon: string }[] = [
 
 export default function KanbanBoard({ boardType }: Props) {
   const { projects, loading, statusFilter, setStatusFilter, updateProjectFlow, updateProject, updateFlowDetails, createProject, reload } = useProjects()
+  const { activeUsers } = useUsers()
+  const { user: currentUser } = useAuth()
+  const { tags } = useTags()
   const [selectedProject, setSelectedProject] = useState<{ project: any; flow: ProjectFlow } | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [areaFilter, setAreaFilter] = useState('all')
+  const [tagFilter, setTagFilter] = useState('all')
+  const [myProjectsOnly, setMyProjectsOnly] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('kanban')
 
   // Sincronizar selectedProject con datos frescos después de cada reload
@@ -84,6 +93,12 @@ export default function KanbanBoard({ boardType }: Props) {
     if (priorityFilter !== 'all' && project.priority !== priorityFilter) return false
     const area = (project as any).requests?.requester_area
     if (areaFilter !== 'all' && area !== areaFilter) return false
+    if (myProjectsOnly && currentUser) {
+      const flows: any[] = (project as any).project_flows ?? []
+      const isAssigned = flows.some(f => f.assigned_to === currentUser.id)
+      if (!isAssigned) return false
+    }
+    if (tagFilter !== 'all' && !(project.tag_ids ?? []).includes(tagFilter)) return false
     return true
   })
 
@@ -108,7 +123,7 @@ export default function KanbanBoard({ boardType }: Props) {
     }
   }
 
-  const hasFilters = priorityFilter !== 'all' || areaFilter !== 'all'
+  const hasFilters = priorityFilter !== 'all' || areaFilter !== 'all' || myProjectsOnly || tagFilter !== 'all'
   const filteredCount = filteredProjects.length
   const totalCount = projects.length
 
@@ -182,10 +197,40 @@ export default function KanbanBoard({ boardType }: Props) {
               </select>
             )}
 
+            {/* Filtro por tag */}
+            {tags.length > 0 && (
+              <select
+                value={tagFilter}
+                onChange={e => setTagFilter(e.target.value)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition cursor-pointer outline-none ${
+                  tagFilter !== 'all'
+                    ? 'border-blue-400 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <option value="all">🏷️ Etiqueta</option>
+                {tags.map(tag => (
+                  <option key={tag.id} value={tag.id}>{tag.name}</option>
+                ))}
+              </select>
+            )}
+
+            {/* Mis proyectos toggle */}
+            <button
+              onClick={() => setMyProjectsOnly(v => !v)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition ${
+                myProjectsOnly
+                  ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                  : 'border-gray-200 bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              👤 Mis proyectos
+            </button>
+
             {hasFilters && (
               <>
                 <button
-                  onClick={() => { setPriorityFilter('all'); setAreaFilter('all') }}
+                  onClick={() => { setPriorityFilter('all'); setAreaFilter('all'); setTagFilter('all'); setMyProjectsOnly(false) }}
                   className="px-3 py-1.5 rounded-full text-sm font-medium border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition"
                 >
                   ✕ Limpiar
@@ -251,6 +296,8 @@ export default function KanbanBoard({ boardType }: Props) {
                 phase={phase}
                 projects={getProjectsByPhase(phase.id)}
                 onProjectClick={setSelectedProject}
+                users={activeUsers}
+                tags={tags}
               />
             ))}
           </div>

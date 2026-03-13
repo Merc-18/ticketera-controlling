@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from './hooks/useAuth'
 import LoginForm from './components/auth/LoginForm'
 import ProtectedRoute from './components/auth/ProtectedRoute'
@@ -9,11 +9,33 @@ import DashboardView from './components/dashboard/DashboardView'
 import PublicRequestForm from './components/requests/PublicRequestForm'
 import RequestTracking from './components/requests/RequestTracking'
 import RequestInbox from './components/requests/RequestInbox'
+import UserManagementPanel from './components/admin/UserManagementPanel'
+import WorkloadView from './components/admin/WorkloadView'
+import TagManagement from './components/admin/TagManagement'
+
+function AdminClock() {
+  const [time, setTime] = useState('')
+  useEffect(() => {
+    const tick = () => setTime(
+      new Date().toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour12: false })
+    )
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
+  return (
+    <div className="text-right hidden sm:block">
+      <p className="text-sm font-mono font-semibold text-gray-800">{time}</p>
+      <p className="text-xs text-gray-400">Lima GMT-5</p>
+    </div>
+  )
+}
 
 function Dashboard() {
   const { user, signOut } = useAuth()
   const [currentBoard, setCurrentBoard] = useState<'development' | 'administrative'>('development')
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'boards' | 'requests'>('dashboard')
+  const [currentTab, setCurrentTab]   = useState<'dashboard' | 'boards' | 'requests' | 'equipo'>('dashboard')
+  const [adminSubTab, setAdminSubTab] = useState<'usuarios' | 'carga' | 'tags'>('carga')
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -58,6 +80,18 @@ function Dashboard() {
                 >
                   📬 Requests
                 </button>
+                {user?.role === 'admin' && (
+                  <button
+                    onClick={() => setCurrentTab('equipo')}
+                    className={`px-4 py-2 rounded-md font-medium text-sm transition ${
+                      currentTab === 'equipo'
+                        ? 'bg-white text-primary shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    👥 Equipo
+                  </button>
+                )}
               </div>
 
               {/* Board Selector (solo si está en boards) */}
@@ -68,6 +102,9 @@ function Dashboard() {
                 />
               )}
               
+              {/* Reloj GMT-5 (solo admins) */}
+              {user?.role === 'admin' && <AdminClock />}
+
               {/* User Info */}
               <div className="flex items-center gap-4">
                 <div className="text-right">
@@ -115,6 +152,55 @@ function Dashboard() {
               </p>
             </div>
             <RequestInbox />
+          </>
+        )}
+
+        {currentTab === 'equipo' && user?.role === 'admin' && (
+          <>
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">👥 Equipo</h2>
+              <p className="text-gray-600 text-sm mt-1">
+                Gestión de usuarios y carga de trabajo del equipo
+              </p>
+            </div>
+
+            {/* Sub-tabs */}
+            <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit mb-6">
+              <button
+                onClick={() => setAdminSubTab('carga')}
+                className={`px-4 py-2 rounded-md font-medium text-sm transition ${
+                  adminSubTab === 'carga'
+                    ? 'bg-white text-primary shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                📊 Carga de Trabajo
+              </button>
+              <button
+                onClick={() => setAdminSubTab('usuarios')}
+                className={`px-4 py-2 rounded-md font-medium text-sm transition ${
+                  adminSubTab === 'usuarios'
+                    ? 'bg-white text-primary shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🔑 Usuarios
+              </button>
+              <button
+                onClick={() => setAdminSubTab('tags')}
+                className={`px-4 py-2 rounded-md font-medium text-sm transition ${
+                  adminSubTab === 'tags'
+                    ? 'bg-white text-primary shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🏷️ Etiquetas
+              </button>
+            </div>
+
+            {adminSubTab === 'carga'    && <WorkloadView />}
+            {adminSubTab === 'usuarios' && <UserManagementPanel />}
+            {adminSubTab === 'tags'     && <TagManagement />}
           </>
         )}
       </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Project, ProjectFlow } from '../types/database.types'
 import { logActivity } from './useActivityLog'
+import { getAutoTagIds } from '../lib/auto-tags'
 
 type StatusFilter = 'active' | 'completed' | 'archived'
 
@@ -124,6 +125,11 @@ export function useProjects() {
     due_date?: string
   }) => {
     try {
+      const autoTagIds = await getAutoTagIds({
+        priority:    projectData.priority,
+        projectType: projectData.project_type,
+      })
+
       const { data: project, error: projectError } = await supabase
         .from('projects')
         .insert([{
@@ -133,7 +139,7 @@ export function useProjects() {
           priority: projectData.priority,
           status: 'active',
           is_blocked: false,
-          tag_ids: [],
+          tag_ids: autoTagIds,
           estimated_hours: projectData.estimated_hours || null,
           start_date: projectData.start_date || null,
           due_date: projectData.due_date || null,
