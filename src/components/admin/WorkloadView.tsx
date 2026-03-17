@@ -73,7 +73,7 @@ export default function WorkloadView() {
         .not('assigned_to', 'is', null)
 
       if (error) throw error
-      setFlows((data as FlowWithProject[]) || [])
+      setFlows((data as unknown as FlowWithProject[]) || [])
     } finally {
       setFlowsLoading(false)
     }
