@@ -3,6 +3,31 @@ import { useRequests } from '../../hooks/useRequests'
 import { useUsers } from '../../hooks/useUsers'
 import type { Request } from '../../types/database.types'
 
+const isUrgent = (r: Request) => !!r.observations?.startsWith('🔴 URGENTE')
+
+const cleanObservations = (obs: string) =>
+  obs.replace(/^🔴 URGENTE\.?\s*/i, '').trim()
+
+function TypeChips({ request }: { request: Request }) {
+  const types = request.needs_code
+    ? request.request_type.split(',').map(t => t.trim()).filter(Boolean)
+    : [request.request_type]
+  return (
+    <div className="flex flex-wrap gap-1">
+      {types.map(t => (
+        <span
+          key={t}
+          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+            request.needs_code ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+          }`}
+        >
+          {t}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function RequestInbox() {
   const { requests, loading, approveRequest, rejectRequest } = useRequests()
   const { activeUsers } = useUsers()
@@ -27,9 +52,22 @@ export default function RequestInbox() {
   const approvedRequests = requests.filter(r => r.status === 'approved')
   const rejectedRequests = requests.filter(r => r.status === 'rejected')
 
+  const openApproveModal = (request: Request) => {
+    const urgent = isUrgent(request)
+    const firstType = request.request_type.split(',')[0].trim()
+    setSelectedRequest(request)
+    setApproveData(d => ({
+      ...d,
+      title: `${firstType} - ${request.requester_area}`,
+      project_type: request.needs_code ? 'development' : 'administrative',
+      priority: urgent ? 'urgent' : 'medium',
+      due_date: request.requested_date ? request.requested_date.slice(0, 10) : '',
+    }))
+    setShowApproveModal(true)
+  }
+
   const handleApprove = async () => {
     if (!selectedRequest) return
-
     setActionLoading(true)
     try {
       await approveRequest(selectedRequest.id, {
@@ -54,7 +92,6 @@ export default function RequestInbox() {
 
   const handleReject = async () => {
     if (!selectedRequest || !rejectionReason.trim()) return
-
     setActionLoading(true)
     try {
       await rejectRequest(selectedRequest.id, rejectionReason)
@@ -107,55 +144,58 @@ export default function RequestInbox() {
             <p className="text-gray-500">No hay solicitudes pendientes</p>
           </div>
         ) : (
-          pendingRequests.map(request => (
-            <div
-              key={request.id}
-              className="bg-white border rounded-lg p-4 hover:shadow-md transition cursor-pointer"
-              onClick={() => setSelectedRequest(request)}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <p className="font-mono font-bold text-primary">{request.request_number}</p>
-                  <p className="font-semibold text-gray-900">{request.requester_name}</p>
-                  <p className="text-sm text-gray-600">{request.requester_area}</p>
+          pendingRequests.map(request => {
+            const urgent = isUrgent(request)
+            return (
+              <div
+                key={request.id}
+                className={`bg-white border rounded-lg p-4 hover:shadow-md transition cursor-pointer ${
+                  urgent ? 'border-red-300' : ''
+                }`}
+                onClick={() => setSelectedRequest(request)}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="font-mono font-bold text-primary">{request.request_number}</p>
+                      {urgent && (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-700 border border-red-200 rounded-full text-xs font-bold">
+                          🔴 URGENTE
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-semibold text-gray-900">{request.requester_name}</p>
+                    <p className="text-sm text-gray-600">{request.requester_area}</p>
+                  </div>
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium border ${statusColors[request.status]}`}>
+                    Pendiente
+                  </span>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium border ${statusColors[request.status]}`}>
-                  Pendiente
-                </span>
-              </div>
 
-              <p className="text-sm text-gray-700 mb-2">
-                <span className="font-medium">Tipo:</span> {request.request_type}
-              </p>
-              <p className="text-sm text-gray-600 line-clamp-2">{request.description}</p>
+                <div className="mb-2">
+                  <TypeChips request={request} />
+                </div>
+                <p className="text-sm text-gray-600 line-clamp-2">{request.description}</p>
 
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setSelectedRequest(request)
-                    setApproveData(d => ({ ...d, title: `${request.request_type} - ${request.requester_area}` }))
-                    setShowApproveModal(true)
-                  }}
-                  disabled={actionLoading}
-                  className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition disabled:opacity-50"
-                >
-                  ✓ Aprobar
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setSelectedRequest(request)
-                    setShowRejectModal(true)
-                  }}
-                  disabled={actionLoading}
-                  className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition disabled:opacity-50"
-                >
-                  ✕ Rechazar
-                </button>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openApproveModal(request) }}
+                    disabled={actionLoading}
+                    className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition disabled:opacity-50"
+                  >
+                    ✓ Aprobar
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setSelectedRequest(request); setShowRejectModal(true) }}
+                    disabled={actionLoading}
+                    className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition disabled:opacity-50"
+                  >
+                    ✕ Rechazar
+                  </button>
+                </div>
               </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
 
@@ -165,13 +205,15 @@ export default function RequestInbox() {
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
             <div className="flex items-start justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900">Detalle de Solicitud</h2>
-              <button
-                onClick={() => setSelectedRequest(null)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                ✕
-              </button>
+              <button onClick={() => setSelectedRequest(null)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
+
+            {isUrgent(selectedRequest) && (
+              <div className="bg-red-50 border border-red-300 rounded-lg px-4 py-3 mb-4 flex items-center gap-2">
+                <span className="text-red-600 font-bold text-sm">🔴 Solicitud marcada como URGENTE</span>
+                <span className="text-red-500 text-xs">— El equipo se contactará directamente para coordinar</span>
+              </div>
+            )}
 
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -203,8 +245,10 @@ export default function RequestInbox() {
               </div>
 
               <div>
-                <p className="text-sm text-gray-600">Tipo de Requerimiento</p>
-                <p className="font-medium">{selectedRequest.request_type}</p>
+                <p className="text-sm text-gray-600 mb-1">
+                  {selectedRequest.needs_code ? 'Producto(s) Requerido(s)' : 'Tipo de Requerimiento'}
+                </p>
+                <TypeChips request={selectedRequest} />
               </div>
 
               <div>
@@ -224,28 +268,26 @@ export default function RequestInbox() {
                 <p className="text-gray-900">{selectedRequest.description}</p>
               </div>
 
-              {selectedRequest.observations && (
+              {selectedRequest.observations && cleanObservations(selectedRequest.observations) && (
                 <div>
                   <p className="text-sm text-gray-600">Observaciones</p>
-                  <p className="text-gray-900">{selectedRequest.observations}</p>
+                  <p className="text-gray-900">{cleanObservations(selectedRequest.observations)}</p>
                 </div>
               )}
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={selectedRequest.needs_code}
-                  disabled
-                  className="w-4 h-4"
-                />
-                <span className="text-sm text-gray-700">Requiere código</span>
+              <div>
+                <span className={`px-2 py-1 rounded text-xs font-medium ${selectedRequest.needs_code ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                  {selectedRequest.needs_code ? '💻 Requiere código' : '📋 No requiere código'}
+                </span>
               </div>
 
               {selectedRequest.requested_date && (
-                <div>
-                  <p className="text-sm text-gray-600">Fecha Límite</p>
-                  <p className="font-medium">
-                    {new Date(selectedRequest.requested_date).toLocaleDateString('es-PE')}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+                  <p className="text-xs text-blue-600 font-medium mb-0.5">⏱ Fecha Estimada de Entrega (SLA)</p>
+                  <p className="font-semibold text-blue-900">
+                    {new Date(selectedRequest.requested_date + 'T12:00:00').toLocaleDateString('es-PE', {
+                      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                    })}
                   </p>
                 </div>
               )}
@@ -254,10 +296,7 @@ export default function RequestInbox() {
             {selectedRequest.status === 'pending' && (
               <div className="mt-6 flex gap-3">
                 <button
-                  onClick={() => {
-                    setApproveData(d => ({ ...d, title: `${selectedRequest.request_type} - ${selectedRequest.requester_area}` }))
-                    setShowApproveModal(true)
-                  }}
+                  onClick={() => openApproveModal(selectedRequest)}
                   disabled={actionLoading}
                   className="flex-1 bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition disabled:opacity-50"
                 >
@@ -281,11 +320,9 @@ export default function RequestInbox() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Rechazar Solicitud</h2>
-            
             <p className="text-gray-600 mb-4">
               Solicitud: <span className="font-mono font-bold text-primary">{selectedRequest.request_number}</span>
             </p>
-
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Razón del Rechazo <span className="text-red-500">*</span>
@@ -298,13 +335,9 @@ export default function RequestInbox() {
                 placeholder="Explica por qué se rechaza esta solicitud..."
               />
             </div>
-
             <div className="flex gap-3">
               <button
-                onClick={() => {
-                  setShowRejectModal(false)
-                  setRejectionReason('')
-                }}
+                onClick={() => { setShowRejectModal(false); setRejectionReason('') }}
                 className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition"
               >
                 Cancelar
@@ -331,9 +364,15 @@ export default function RequestInbox() {
             </div>
 
             {/* Info solicitud */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-5 text-sm">
-              <p className="font-medium text-blue-900">{selectedRequest.request_number} · {selectedRequest.requester_name}</p>
-              <p className="text-blue-700">{selectedRequest.request_type} · {selectedRequest.requester_area}</p>
+            <div className={`border rounded-lg px-4 py-3 mb-5 text-sm ${isUrgent(selectedRequest) ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}>
+              <p className={`font-medium mb-1.5 ${isUrgent(selectedRequest) ? 'text-red-900' : 'text-blue-900'}`}>
+                {selectedRequest.request_number} · {selectedRequest.requester_name}
+                {isUrgent(selectedRequest) && <span className="ml-2 text-xs font-bold text-red-600">🔴 URGENTE</span>}
+              </p>
+              <TypeChips request={selectedRequest} />
+              <span className={`text-xs mt-1.5 inline-block ${isUrgent(selectedRequest) ? 'text-red-600' : 'text-blue-600'}`}>
+                {selectedRequest.requester_area}
+              </span>
             </div>
 
             <div className="space-y-4 mb-6">
@@ -404,7 +443,12 @@ export default function RequestInbox() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Vencimiento</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Fecha de Vencimiento
+                    {selectedRequest.requested_date && (
+                      <span className="text-xs text-blue-500 ml-1">(del SLA)</span>
+                    )}
+                  </label>
                   <input
                     type="date"
                     value={approveData.due_date}
@@ -414,12 +458,11 @@ export default function RequestInbox() {
                 </div>
               </div>
 
-              {/* ── Asignación de responsables ── */}
+              {/* Asignación */}
               {activeUsers.length > 0 && (
                 <div className="border-t pt-4 space-y-3">
                   <p className="text-sm font-semibold text-gray-700">👤 Asignación de responsables</p>
 
-                  {/* Development / único */}
                   {(approveData.project_type === 'development' || approveData.project_type === 'dual') && (
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
@@ -438,7 +481,6 @@ export default function RequestInbox() {
                     </div>
                   )}
 
-                  {/* Dual: mismo usuario toggle + admin dropdown */}
                   {approveData.project_type === 'dual' && (
                     <>
                       <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -475,7 +517,6 @@ export default function RequestInbox() {
                     </>
                   )}
 
-                  {/* Administrative solo */}
                   {approveData.project_type === 'administrative' && (
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">👤 Responsable</label>
