@@ -8,6 +8,7 @@ import BoardSelector from './components/boards/BoardSelector'
 import DashboardView from './components/dashboard/DashboardView'
 import PublicRequestForm from './components/requests/PublicRequestForm'
 import RequestTracking from './components/requests/RequestTracking'
+import PublicLanding from './components/requests/PublicLanding'
 import RequestInbox from './components/requests/RequestInbox'
 import UserManagementPanel from './components/admin/UserManagementPanel'
 import WorkloadView from './components/admin/WorkloadView'
@@ -213,6 +214,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginForm />} />
+        <Route path="/portal" element={<PublicLanding />} />
         <Route path="/request" element={<PublicRequestForm />} />
         <Route path="/tracking" element={<RequestTracking />} />
         <Route

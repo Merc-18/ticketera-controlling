@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useRequests } from '../../hooks/useRequests'
 
 const AREAS   = ['AASS', 'ATC', 'DDC', 'QA', 'SAQ']
@@ -63,6 +64,7 @@ const EMPTY_FORM = {
 }
 
 export default function PublicRequestForm() {
+  const navigate = useNavigate()
   const { createRequest } = useRequests()
   const [loading, setLoading]           = useState(false)
   const [success, setSuccess]           = useState(false)
@@ -176,11 +178,20 @@ export default function PublicRequestForm() {
         <div className="bg-white rounded-2xl shadow-2xl p-8">
 
           {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">📝 Nueva Solicitud</h1>
-            <p className="text-gray-600">
-              Completa el formulario para crear una solicitud al equipo de Controlling
-            </p>
+          <div className="mb-8">
+            <button
+              type="button"
+              onClick={() => navigate('/portal')}
+              className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition mb-4"
+            >
+              ← Inicio
+            </button>
+            <div className="text-center">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">📝 Nueva Solicitud</h1>
+              <p className="text-gray-600">
+                Completa el formulario para crear una solicitud al equipo de Controlling
+              </p>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-8">

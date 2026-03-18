@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useRequests } from '../../hooks/useRequests'
 import type { Request } from '../../types/database.types'
 
@@ -28,6 +29,7 @@ function TypeChips({ request }: { request: Request }) {
 }
 
 export default function RequestTracking() {
+  const navigate = useNavigate()
   const { getRequestByNumber } = useRequests()
   const [requestNumber, setRequestNumber] = useState('')
   const [request, setRequest] = useState<Request | null>(null)
@@ -66,11 +68,19 @@ export default function RequestTracking() {
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">🔍 Rastrear Solicitud</h1>
-            <p className="text-gray-600">
-              Ingresa tu número de seguimiento para ver el estado de tu solicitud
-            </p>
+          <div className="mb-8">
+            <button
+              onClick={() => navigate('/portal')}
+              className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition mb-4"
+            >
+              ← Inicio
+            </button>
+            <div className="text-center">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">🔍 Rastrear Solicitud</h1>
+              <p className="text-gray-600">
+                Ingresa tu número de seguimiento para ver el estado de tu solicitud
+              </p>
+            </div>
           </div>
 
           {/* Search Form */}
