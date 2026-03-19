@@ -54,7 +54,6 @@ export default function ProjectCard({ project, flow, onClick, users = [], tags =
   const area = project.requests?.requester_area
   const areaColorClass = area ? (AREA_COLORS[area] ?? 'bg-gray-100 text-gray-600') : ''
   const dueBadge = getDueDateBadge(project.due_date)
-  const projectTags = tags.filter(t => (project.tag_ids ?? []).includes(t.id))
 
   // Collect all assigned users across all flows (for dual projects, show both)
   const allFlows: Array<{ assigned_to: string | null; flow_type: string }> =
@@ -103,15 +102,6 @@ export default function ProjectCard({ project, flow, onClick, users = [], tags =
             {dueBadge.label}
           </span>
         )}
-        {projectTags.map(tag => (
-          <span
-            key={tag.id}
-            className="px-1.5 py-0.5 rounded text-xs font-medium text-white"
-            style={{ backgroundColor: tag.color }}
-          >
-            {tag.name}
-          </span>
-        ))}
       </div>
 
       {/* Progress bar */}
