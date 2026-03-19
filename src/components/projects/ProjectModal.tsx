@@ -4,7 +4,6 @@ import CommentsSection from './CommentsSection'
 import ChecklistSection from './ChecklistSection'
 import ActivitySection from './ActivitySection'
 import { useUsers } from '../../hooks/useUsers'
-import { useTags } from '../../hooks/useTags'
 import { supabase } from '../../lib/supabase'
 
 interface Props {
@@ -58,7 +57,6 @@ const AREA_COLORS: Record<string, string> = {
 
 export default function ProjectModal({ project, flows, onClose, onUpdate, updateProject, updateFlowDetails }: Props) {
   const { activeUsers } = useUsers()
-  const { tags } = useTags()
   const [activeTab, setActiveTab] = useState<'details' | 'checklist' | 'comments' | 'activity'>('details')
   const [editMode, setEditMode] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -69,11 +67,8 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
     title: project.title,
     description: project.description,
     priority: project.priority,
-    estimated_hours: project.estimated_hours ?? '',
-    actual_hours: project.actual_hours ?? '',
     start_date: project.start_date ?? '',
     due_date: project.due_date ?? '',
-    tag_ids: project.tag_ids ?? [] as string[],
     requester_area: project.requests?.requester_area ?? '',
   })
 
@@ -128,11 +123,8 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
         title: editData.title,
         description: editData.description,
         priority: editData.priority as Project['priority'],
-        estimated_hours: editData.estimated_hours !== '' ? Number(editData.estimated_hours) : undefined,
-        actual_hours: editData.actual_hours !== '' ? Number(editData.actual_hours) : undefined,
         start_date: editData.start_date || undefined,
         due_date: editData.due_date || undefined,
-        tag_ids: editData.tag_ids,
       })
       // Update requester_area on the linked request if it changed
       if (project.request_id && editData.requester_area !== (project.requests?.requester_area ?? '')) {
@@ -422,48 +414,6 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
                 </div>
               )}
 
-              {/* Horas */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-2 text-sm">Horas Estimadas</h3>
-                  {editMode ? (
-                    <input
-                      type="number" min="0"
-                      value={editData.estimated_hours}
-                      onChange={e => setEditData(prev => ({ ...prev, estimated_hours: e.target.value }))}
-                      placeholder="ej. 16"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  ) : (
-                    <div className="bg-gray-50 rounded-lg p-3 border text-center">
-                      <p className="text-2xl font-bold text-gray-900">
-                        {project.estimated_hours ?? '—'}
-                        {project.estimated_hours && <span className="text-base font-normal text-gray-500">h</span>}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-2 text-sm">Horas Reales</h3>
-                  {editMode ? (
-                    <input
-                      type="number" min="0"
-                      value={editData.actual_hours}
-                      onChange={e => setEditData(prev => ({ ...prev, actual_hours: e.target.value }))}
-                      placeholder="ej. 12"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  ) : (
-                    <div className="bg-gray-50 rounded-lg p-3 border text-center">
-                      <p className="text-2xl font-bold text-gray-900">
-                        {project.actual_hours ?? '—'}
-                        {project.actual_hours && <span className="text-base font-normal text-gray-500">h</span>}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
               {/* Fechas de inicio y vencimiento */}
               {editMode ? (
                 <div className="grid grid-cols-2 gap-4">
@@ -511,54 +461,6 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
                   )}
                 </div>
               ) : null}
-
-              {/* Etiquetas / Tags */}
-              {tags.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">🏷️ Etiquetas</h3>
-                  {editMode ? (
-                    <div className="flex flex-wrap gap-2">
-                      {tags.map(tag => {
-                        const selected = editData.tag_ids.includes(tag.id)
-                        return (
-                          <button
-                            key={tag.id}
-                            type="button"
-                            onClick={() => setEditData(prev => ({
-                              ...prev,
-                              tag_ids: selected
-                                ? prev.tag_ids.filter(id => id !== tag.id)
-                                : [...prev.tag_ids, tag.id]
-                            }))}
-                            className={`px-2.5 py-1 rounded-full text-xs font-medium border-2 transition ${
-                              selected ? 'text-white border-transparent' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400'
-                            }`}
-                            style={selected ? { backgroundColor: tag.color, borderColor: tag.color } : {}}
-                          >
-                            {selected ? '✓ ' : ''}{tag.name}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {(project.tag_ids ?? []).length === 0 ? (
-                        <p className="text-sm text-gray-400 italic">Sin etiquetas</p>
-                      ) : (
-                        tags.filter(t => (project.tag_ids ?? []).includes(t.id)).map(tag => (
-                          <span
-                            key={tag.id}
-                            className="px-2 py-0.5 rounded-full text-xs font-medium text-white"
-                            style={{ backgroundColor: tag.color }}
-                          >
-                            {tag.name}
-                          </span>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Razón del bloqueo (solo lectura) */}
               {project.is_blocked && project.blocked_reason && (

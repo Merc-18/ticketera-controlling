@@ -9,7 +9,6 @@ import NewProjectModal from '../projects/NewProjectModal'
 import { useProjects } from '../../hooks/useProjects'
 import { useUsers } from '../../hooks/useUsers'
 import { useAuth } from '../../hooks/useAuth'
-import { useTags } from '../../hooks/useTags'
 import type { ProjectFlow, User } from '../../types/database.types'
 
 
@@ -64,12 +63,10 @@ export default function KanbanBoard({ boardType }: Props) {
   const { projects, loading, statusFilter, setStatusFilter, updateProjectFlow, updateProject, updateFlowDetails, createProject, reload } = useProjects()
   const { activeUsers } = useUsers()
   const { user: currentUser } = useAuth()
-  const { tags } = useTags()
   const [selectedProject, setSelectedProject] = useState<{ project: any; flow: ProjectFlow } | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [areaFilter, setAreaFilter] = useState('all')
-  const [tagFilter, setTagFilter] = useState('all')
   const [myProjectsOnly, setMyProjectsOnly] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('kanban')
 
@@ -98,7 +95,6 @@ export default function KanbanBoard({ boardType }: Props) {
       const isAssigned = flows.some(f => f.assigned_to === currentUser.id)
       if (!isAssigned) return false
     }
-    if (tagFilter !== 'all' && !(project.tag_ids ?? []).includes(tagFilter)) return false
     return true
   })
 
@@ -123,7 +119,7 @@ export default function KanbanBoard({ boardType }: Props) {
     }
   }
 
-  const hasFilters = priorityFilter !== 'all' || areaFilter !== 'all' || myProjectsOnly || tagFilter !== 'all'
+  const hasFilters = priorityFilter !== 'all' || areaFilter !== 'all' || myProjectsOnly
   const filteredCount = filteredProjects.length
   const totalCount = projects.length
 
@@ -193,24 +189,6 @@ export default function KanbanBoard({ boardType }: Props) {
                 <option value="all">Área</option>
                 {availableAreas.map(area => (
                   <option key={area} value={area}>{area}</option>
-                ))}
-              </select>
-            )}
-
-            {/* Filtro por tag */}
-            {tags.length > 0 && (
-              <select
-                value={tagFilter}
-                onChange={e => setTagFilter(e.target.value)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition cursor-pointer outline-none ${
-                  tagFilter !== 'all'
-                    ? 'border-blue-400 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <option value="all">🏷️ Etiqueta</option>
-                {tags.map(tag => (
-                  <option key={tag.id} value={tag.id}>{tag.name}</option>
                 ))}
               </select>
             )}
@@ -297,7 +275,6 @@ export default function KanbanBoard({ boardType }: Props) {
                 projects={getProjectsByPhase(phase.id)}
                 onProjectClick={setSelectedProject}
                 users={activeUsers}
-                tags={tags}
               />
             ))}
           </div>
