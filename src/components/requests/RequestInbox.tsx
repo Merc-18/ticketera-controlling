@@ -41,7 +41,6 @@ export default function RequestInbox() {
     project_type: 'development' as 'development' | 'administrative' | 'dual',
     priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
     title: '',
-    estimated_hours: '',
     start_date: '',
     due_date: '',
     assigned_dev: '',
@@ -72,7 +71,6 @@ export default function RequestInbox() {
     try {
       await approveRequest(selectedRequest.id, {
         ...approveData,
-        estimated_hours: approveData.estimated_hours ? Number(approveData.estimated_hours) : undefined,
         start_date: approveData.start_date || undefined,
         due_date: approveData.due_date || undefined,
         assigned_dev:   approveData.assigned_dev   || undefined,
@@ -417,18 +415,6 @@ export default function RequestInbox() {
                     <option value="urgent">🔴 Urgente</option>
                   </select>
                 </div>
-              </div>
-
-              {/* Horas estimadas */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Horas Estimadas</label>
-                <input
-                  type="number" min="0"
-                  value={approveData.estimated_hours}
-                  onChange={e => setApproveData(d => ({ ...d, estimated_hours: e.target.value }))}
-                  placeholder="ej. 40"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary"
-                />
               </div>
 
               {/* Fechas */}

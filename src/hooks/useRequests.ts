@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import type { Request } from '../types/database.types'
 import { DEFAULT_CHECKLIST } from '../lib/checklist-defaults'
 import { getAutoTagIds } from '../lib/auto-tags'
+import { logActivity } from './useActivityLog'
 
 export function useRequests() {
   const [requests, setRequests] = useState<Request[]>([])
@@ -56,11 +57,10 @@ const approveRequest = async (requestId: string, projectData: {
   project_type: 'development' | 'administrative' | 'dual'
   priority: 'low' | 'medium' | 'high' | 'urgent'
   title?: string
-  estimated_hours?: number
   start_date?: string
   due_date?: string
-  assigned_dev?: string    // UUID del usuario responsable del flujo development
-  assigned_admin?: string  // UUID del usuario responsable del flujo administrative
+  assigned_dev?: string
+  assigned_admin?: string
 }) => {
   try {
     // 1. Obtener el request
@@ -91,7 +91,6 @@ const approveRequest = async (requestId: string, projectData: {
         status: 'active',
         is_blocked: false,
         tag_ids: autoTagIds,
-        estimated_hours: projectData.estimated_hours || null,
         start_date: projectData.start_date || null,
         due_date: projectData.due_date || null,
       }])
@@ -99,6 +98,12 @@ const approveRequest = async (requestId: string, projectData: {
       .single()
 
     if (projectError) throw projectError
+
+    // Log SLA start
+    await logActivity(project.id, 'sla_started', {
+      sla_due_date: projectData.due_date || null,
+      request_number: request.request_number,
+    })
 
     // 3. Crear los flujos según el tipo de proyecto
     const flows = []

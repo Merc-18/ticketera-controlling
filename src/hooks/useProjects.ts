@@ -54,6 +54,27 @@ export function useProjects() {
       // Registrar actividad según qué cambió
       if (updates.status && current?.status !== updates.status) {
         await logActivity(projectId, 'status_changed', { from: current?.status, to: updates.status })
+
+        // SLA completado
+        if (updates.status === 'completed') {
+          const { data: slaLog } = await supabase
+            .from('activity_logs')
+            .select('created_at, details')
+            .eq('project_id', projectId)
+            .eq('action', 'sla_started')
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .single()
+
+          if (slaLog) {
+            const daysElapsed = Math.ceil(
+              (Date.now() - new Date(slaLog.created_at).getTime()) / (1000 * 60 * 60 * 24)
+            )
+            const dueDate = (slaLog.details as any)?.sla_due_date
+            const onTime = dueDate ? new Date() <= new Date(dueDate + 'T23:59:59') : undefined
+            await logActivity(projectId, 'sla_completed', { days_elapsed: daysElapsed, due_date: dueDate, on_time: onTime })
+          }
+        }
       } else if (updates.is_blocked === true) {
         await logActivity(projectId, 'blocked', { reason: updates.blocked_reason })
       } else if (updates.is_blocked === false) {
@@ -105,7 +126,21 @@ export function useProjects() {
       if (error) throw error
 
       if (projectId) {
-        await logActivity(projectId, 'phase_changed', { from: fromPhase, to: newPhase })
+        // Calcular tiempo en la fase anterior
+        const { data: lastLog } = await supabase
+          .from('activity_logs')
+          .select('created_at')
+          .eq('project_id', projectId)
+          .in('action', ['phase_changed', 'sla_started', 'created'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        const duration_ms = lastLog
+          ? Date.now() - new Date(lastLog.created_at).getTime()
+          : undefined
+
+        await logActivity(projectId, 'phase_changed', { from: fromPhase, to: newPhase, duration_ms })
       }
 
       await loadProjects()
