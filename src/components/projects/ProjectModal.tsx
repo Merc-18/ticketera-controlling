@@ -73,11 +73,11 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
   })
 
   const [blockReason, setBlockReason] = useState(project.blocked_reason ?? '')
-  const [flowEdits, setFlowEdits] = useState<Record<string, { progress: number; assigned_to: string }>>(
-    () => Object.fromEntries(flows.map(f => [f.id, { progress: f.progress, assigned_to: f.assigned_to ?? '' }]))
+  const [flowEdits, setFlowEdits] = useState<Record<string, { assigned_to: string }>>(
+    () => Object.fromEntries(flows.map(f => [f.id, { assigned_to: f.assigned_to ?? '' }]))
   )
-  const [flowSaved, setFlowSaved] = useState<Record<string, { progress: number; assigned_to: string }>>(
-    () => Object.fromEntries(flows.map(f => [f.id, { progress: f.progress, assigned_to: f.assigned_to ?? '' }]))
+  const [flowSaved, setFlowSaved] = useState<Record<string, { assigned_to: string }>>(
+    () => Object.fromEntries(flows.map(f => [f.id, { assigned_to: f.assigned_to ?? '' }]))
   )
   const [savingFlow, setSavingFlow] = useState<string | null>(null)
   const [reassigningFlow, setReassigningFlow] = useState<string | null>(null)
@@ -97,16 +97,15 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
         // Sin cambios pendientes → actualizar con el valor fresco de la DB
         const noPendingChange =
           !edit ||
-          (edit.progress === (saved?.progress ?? f.progress) &&
-           edit.assigned_to.trim() === (saved?.assigned_to ?? '').trim())
+          edit.assigned_to.trim() === (saved?.assigned_to ?? '').trim()
         if (noPendingChange) {
-          next[f.id] = { progress: f.progress, assigned_to: f.assigned_to ?? '' }
+          next[f.id] = { assigned_to: f.assigned_to ?? '' }
         }
       })
       return next
     })
     setFlowSaved(
-      Object.fromEntries(flows.map(f => [f.id, { progress: f.progress, assigned_to: f.assigned_to ?? '' }]))
+      Object.fromEntries(flows.map(f => [f.id, { assigned_to: f.assigned_to ?? '' }]))
     )
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flows])
@@ -193,7 +192,6 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
     try {
       const edit = flowEdits[flowId]
       await updateFlowDetails(flowId, {
-        progress: edit.progress,
         assigned_to: edit.assigned_to.trim() || undefined,
       })
       // Actualizar el baseline para que isDirty vuelva a false
@@ -482,9 +480,9 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
                 </h3>
                 <div className="space-y-4">
                   {flows.map(flow => {
-                    const fe = flowEdits[flow.id] ?? { progress: flow.progress, assigned_to: flow.assigned_to ?? '' }
-                    const saved = flowSaved[flow.id] ?? { progress: flow.progress, assigned_to: flow.assigned_to ?? '' }
-                    const isDirty = fe.progress !== saved.progress || fe.assigned_to.trim() !== saved.assigned_to.trim()
+                    const fe = flowEdits[flow.id] ?? { assigned_to: flow.assigned_to ?? '' }
+                    const saved = flowSaved[flow.id] ?? { assigned_to: flow.assigned_to ?? '' }
+                    const isDirty = fe.assigned_to.trim() !== saved.assigned_to.trim()
                     const assignedUser = fe.assigned_to ? activeUsers.find(u => u.id === fe.assigned_to) ?? null : null
                     return (
                       <div key={flow.id} className="bg-gray-50 rounded-lg p-4 border space-y-3">
@@ -495,24 +493,6 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
                           <span className="text-sm text-gray-600">
                             Fase: <span className="font-medium">{PHASE_LABELS[flow.current_phase] || flow.current_phase}</span>
                           </span>
-                        </div>
-
-                        {/* Progreso editable */}
-                        <div>
-                          <div className="flex items-center justify-between text-sm text-gray-600 mb-1.5">
-                            <span>Progreso</span>
-                            <span className="font-bold text-primary">{fe.progress}%</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="0" max="100" step="5"
-                            value={fe.progress}
-                            onChange={e => setFlowEdits(prev => ({
-                              ...prev,
-                              [flow.id]: { ...prev[flow.id], progress: Number(e.target.value) }
-                            }))}
-                            className="w-full accent-primary cursor-pointer"
-                          />
                         </div>
 
                         {/* Assigned to */}
@@ -582,23 +562,6 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
                 </div>
               </div>
 
-              {flows.length > 1 && (
-                <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-blue-900 mb-3">Progreso Total del Proyecto</h3>
-                  <div className="flex items-center justify-between text-sm text-blue-700 mb-2">
-                    <span>Promedio de ambos flujos</span>
-                    <span className="font-bold text-xl text-blue-900">
-                      {Math.round(flows.reduce((sum, f) => sum + f.progress, 0) / flows.length)}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-blue-200 rounded-full h-4">
-                    <div
-                      className="bg-blue-600 h-4 rounded-full transition-all duration-300"
-                      style={{ width: `${Math.round(flows.reduce((sum, f) => sum + f.progress, 0) / flows.length)}%` }}
-                    />
-                  </div>
-                </div>
-              )}
 
               {/* Fechas */}
               <div className="grid grid-cols-2 gap-4 text-sm">

@@ -1,7 +1,24 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useRequests } from '../../hooks/useRequests'
+import { supabase } from '../../lib/supabase'
 import type { Request } from '../../types/database.types'
+
+interface ProjectFlow {
+  id: string
+  flow_type: string
+  current_phase: string
+  progress: number
+}
+
+const DEV_PHASES = ['backlog', 'design', 'dev', 'testing', 'deploy', 'done']
+const ADM_PHASES = ['backlog', 'ready_to_start', 'discovery', 'build', 'uat_validation', 'deployed']
+
+const PHASE_LABELS: Record<string, string> = {
+  backlog: 'Backlog', design: 'Design', dev: 'Development', testing: 'Testing',
+  deploy: 'Deploy', done: 'Done', ready_to_start: 'Ready to Start',
+  discovery: 'Discovery', build: 'Build', uat_validation: 'UAT/Validation', deployed: 'Deployed',
+}
 
 const isUrgent = (r: Request) => !!r.observations?.startsWith('🔴 URGENTE')
 
@@ -33,6 +50,7 @@ export default function RequestTracking() {
   const { getRequestByNumber } = useRequests()
   const [requestNumber, setRequestNumber] = useState('')
   const [request, setRequest] = useState<Request | null>(null)
+  const [flows, setFlows] = useState<ProjectFlow[]>([])
   const [loading, setLoading] = useState(false)
   const [notFound, setNotFound] = useState(false)
 
@@ -41,11 +59,19 @@ export default function RequestTracking() {
     setLoading(true)
     setNotFound(false)
     setRequest(null)
+    setFlows([])
 
     try {
       const result = await getRequestByNumber(requestNumber.toUpperCase())
       if (result) {
         setRequest(result)
+        if (result.project_id) {
+          const { data: flowData } = await supabase
+            .from('project_flows')
+            .select('id, flow_type, current_phase, progress')
+            .eq('project_id', result.project_id)
+          setFlows((flowData as ProjectFlow[]) || [])
+        }
       } else {
         setNotFound(true)
       }
@@ -195,6 +221,42 @@ export default function RequestTracking() {
                     <p className={`text-xs mt-1.5 ${isUrgent(request) ? 'text-red-500' : 'text-blue-500'}`}>
                       * El plazo corre a partir del siguiente día laboral tras el envío de la solicitud. Los días laborales excluyen sábados y domingos.
                     </p>
+                  </div>
+                )}
+
+                {/* Progreso de fases */}
+                {flows.length > 0 && (
+                  <div className="space-y-4">
+                    {flows.map(flow => {
+                      const phases = flow.flow_type === 'development' ? DEV_PHASES : ADM_PHASES
+                      const currentIdx = phases.indexOf(flow.current_phase)
+                      return (
+                        <div key={flow.id}>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm font-medium text-gray-700">
+                              {flow.flow_type === 'development' ? '💻 Desarrollo' : '📋 Administrativo'}
+                            </p>
+                            <span className="text-sm font-bold text-primary">{flow.progress}%</span>
+                          </div>
+                          <div className="flex items-center gap-0.5">
+                            {phases.map((phase, idx) => {
+                              const done = idx < currentIdx
+                              const active = idx === currentIdx
+                              return (
+                                <div key={phase} className="flex-1 flex flex-col items-center gap-1">
+                                  <div className={`h-2 w-full rounded-full ${done ? 'bg-primary' : active ? 'bg-blue-300' : 'bg-gray-200'}`} />
+                                  {active && (
+                                    <span className="text-[9px] text-primary font-semibold leading-none text-center">
+                                      {PHASE_LABELS[phase]}
+                                    </span>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
 

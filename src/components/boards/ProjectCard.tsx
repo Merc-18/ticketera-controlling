@@ -1,7 +1,7 @@
 import type { Project, ProjectFlow, User, Tag } from '../../types/database.types'
 
 interface ProjectWithArea extends Project {
-  requests?: { requester_area: string } | null
+  requests?: { requester_area: string; request_number?: string } | null
 }
 
 interface Props {
@@ -52,6 +52,7 @@ function getDueDateBadge(dueDate?: string | null) {
 
 export default function ProjectCard({ project, flow, onClick, users = [], tags = [] }: Props) {
   const area = project.requests?.requester_area
+  const requestNumber = project.requests?.request_number
   const areaColorClass = area ? (AREA_COLORS[area] ?? 'bg-gray-100 text-gray-600') : ''
   const dueBadge = getDueDateBadge(project.due_date)
 
@@ -104,23 +105,14 @@ export default function ProjectCard({ project, flow, onClick, users = [], tags =
         )}
       </div>
 
-      {/* Progress bar */}
-      <div className="mb-2.5">
-        <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-          <span>Progreso</span>
-          <span className="font-semibold text-gray-700">{flow.progress}%</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-1.5">
-          <div
-            className="bg-primary h-1.5 rounded-full transition-all duration-300"
-            style={{ width: `${flow.progress}%` }}
-          />
-        </div>
-      </div>
-
       {/* Footer */}
       <div className="flex items-center justify-between text-xs text-gray-400">
-        <span>{new Date(project.updated_at).toLocaleDateString('es-PE')}</span>
+        <span>
+          {requestNumber && (
+            <span className="font-mono text-gray-500 mr-1.5">{requestNumber}</span>
+          )}
+          {new Date(project.updated_at).toLocaleDateString('es-PE')}
+        </span>
         {assignedUsers.length > 0 ? (
           <div className="flex items-center gap-1">
             {assignedUsers.map(({ user, flowType }) => (

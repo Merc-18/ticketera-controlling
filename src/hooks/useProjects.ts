@@ -24,7 +24,7 @@ export function useProjects() {
         .select(`
           *,
           project_flows (*),
-          requests (requester_area, requester_name, request_type)
+          requests (requester_area, requester_name, request_type, request_number)
         `)
         .eq('status', status)
         .order('created_at', { ascending: false })
@@ -55,7 +55,7 @@ export function useProjects() {
       if (updates.status && current?.status !== updates.status) {
         await logActivity(projectId, 'status_changed', { from: current?.status, to: updates.status })
 
-        // SLA completado
+        // SLA + Lead Time al completar
         if (updates.status === 'completed') {
           const { data: slaLog } = await supabase
             .from('activity_logs')
@@ -67,12 +67,35 @@ export function useProjects() {
             .single()
 
           if (slaLog) {
-            const daysElapsed = Math.ceil(
-              (Date.now() - new Date(slaLog.created_at).getTime()) / (1000 * 60 * 60 * 24)
-            )
+            const now = Date.now()
+            const approvalDate = new Date(slaLog.created_at).getTime()
+            const daysElapsed = Math.ceil((now - approvalDate) / (1000 * 60 * 60 * 24))
             const dueDate = (slaLog.details as any)?.sla_due_date
             const onTime = dueDate ? new Date() <= new Date(dueDate + 'T23:59:59') : undefined
-            await logActivity(projectId, 'sla_completed', { days_elapsed: daysElapsed, due_date: dueDate, on_time: onTime })
+
+            // Lead time: desde creación del request hasta hoy
+            let leadTimeDays: number | undefined
+            let approvalWaitDays: number | undefined
+            if (current?.request_id) {
+              const { data: req } = await supabase
+                .from('requests')
+                .select('created_at')
+                .eq('id', current.request_id)
+                .single()
+              if (req) {
+                const requestCreated = new Date(req.created_at).getTime()
+                leadTimeDays = Math.ceil((now - requestCreated) / (1000 * 60 * 60 * 24))
+                approvalWaitDays = Math.ceil((approvalDate - requestCreated) / (1000 * 60 * 60 * 24))
+              }
+            }
+
+            await logActivity(projectId, 'sla_completed', {
+              cycle_time_days: daysElapsed,
+              due_date: dueDate,
+              on_time: onTime,
+              ...(leadTimeDays !== undefined && { lead_time_days: leadTimeDays }),
+              ...(approvalWaitDays !== undefined && { approval_wait_days: approvalWaitDays }),
+            })
           }
         }
       } else if (updates.is_blocked === true) {
@@ -108,6 +131,13 @@ export function useProjects() {
     }
   }
 
+  const PHASE_PROGRESS: Record<string, number> = {
+    // development
+    backlog: 0, design: 20, dev: 40, testing: 60, deploy: 80, done: 100,
+    // administrative
+    ready_to_start: 20, discovery: 40, build: 60, uat_validation: 80, deployed: 100,
+  }
+
   const updateProjectFlow = async (flowId: string, newPhase: string) => {
     try {
       // Encontrar la fase actual para registrar el cambio
@@ -118,9 +148,11 @@ export function useProjects() {
         if (flow) { projectId = p.id; fromPhase = flow.current_phase; break }
       }
 
+      const newProgress = PHASE_PROGRESS[newPhase] ?? 0
+
       const { error } = await supabase
         .from('project_flows')
-        .update({ current_phase: newPhase })
+        .update({ current_phase: newPhase, progress: newProgress })
         .eq('id', flowId)
 
       if (error) throw error

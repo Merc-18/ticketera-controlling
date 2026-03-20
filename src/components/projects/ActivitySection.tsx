@@ -103,12 +103,30 @@ export default function ActivitySection({ projectId }: Props) {
 
               {/* SLA completado */}
               {log.action === 'sla_completed' && (
-                <p className={`text-xs mt-0.5 font-medium ${d?.on_time === true ? 'text-green-600' : d?.on_time === false ? 'text-red-500' : 'text-gray-500'}`}>
-                  {d?.on_time === true && '✓ Entregado a tiempo'}
-                  {d?.on_time === false && '⚠ Fuera de SLA'}
-                  {d?.on_time === undefined && 'Completado'}
-                  {d?.days_elapsed !== undefined && <span className="font-normal text-gray-400"> · {d.days_elapsed} días desde aprobación</span>}
-                </p>
+                <div className="mt-0.5 space-y-0.5">
+                  <p className={`text-xs font-medium ${d?.on_time === true ? 'text-green-600' : d?.on_time === false ? 'text-red-500' : 'text-gray-500'}`}>
+                    {d?.on_time === true && '✓ Entregado a tiempo'}
+                    {d?.on_time === false && '⚠ Fuera de SLA'}
+                    {d?.on_time === undefined && 'Completado'}
+                  </p>
+                  {/* Cycle Time: aprobación → completado */}
+                  {(d?.cycle_time_days ?? d?.days_elapsed) !== undefined && (
+                    <p className="text-xs text-gray-500">
+                      🔄 <span className="font-medium">Cycle Time:</span> {d.cycle_time_days ?? d.days_elapsed}d
+                      <span className="text-gray-400"> (aprobación → entrega)</span>
+                    </p>
+                  )}
+                  {/* Lead Time: solicitud → completado */}
+                  {d?.lead_time_days !== undefined && (
+                    <p className="text-xs text-gray-500">
+                      📦 <span className="font-medium">Lead Time:</span> {d.lead_time_days}d
+                      <span className="text-gray-400"> (solicitud → entrega)</span>
+                      {d?.approval_wait_days !== undefined && (
+                        <span className="text-gray-400"> · espera aprobación: {d.approval_wait_days}d</span>
+                      )}
+                    </p>
+                  )}
+                </div>
               )}
 
               {d?.reason && (

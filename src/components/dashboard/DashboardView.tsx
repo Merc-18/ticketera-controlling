@@ -1,7 +1,9 @@
-import { useDashboardData } from '../../hooks/useDashboardData'
+import { useDashboardData, type DashboardStats } from '../../hooks/useDashboardData'
+
+// ── Reusable components ──────────────────────────────────────────────────────
 
 function StatCard({ label, value, color, icon }: {
-  label: string; value: number; color: string; icon: string
+  label: string; value: number | string; color: string; icon: string
 }) {
   return (
     <div className={`bg-white rounded-xl border-l-4 ${color} p-5 shadow-sm flex items-center gap-4`}>
@@ -40,6 +42,83 @@ function HBarChart({ title, items }: {
   )
 }
 
+function SLABreakdown({ sla }: { sla: DashboardStats['sla'] }) {
+  const rateColor = sla.rate >= 80 ? 'text-green-600' : sla.rate >= 60 ? 'text-yellow-500' : 'text-red-500'
+  const barColor  = sla.rate >= 80 ? 'bg-green-500' : sla.rate >= 60 ? 'bg-yellow-400' : 'bg-red-500'
+
+  return (
+    <div className="bg-white rounded-xl border p-5 shadow-sm">
+      <h3 className="font-semibold text-gray-800 mb-4 text-sm uppercase tracking-wide">Cumplimiento SLA</h3>
+      {sla.total === 0 ? (
+        <p className="text-gray-400 text-sm text-center py-6">Sin proyectos completados aún</p>
+      ) : (
+        <div className="flex items-center gap-6">
+          <div className="text-center shrink-0">
+            <p className={`text-5xl font-bold ${rateColor}`}>{sla.rate}%</p>
+            <p className="text-xs text-gray-400 mt-1">{sla.total} proyectos</p>
+          </div>
+          <div className="flex-1">
+            <div className="h-6 rounded-full overflow-hidden bg-red-100 flex">
+              <div className={`${barColor} transition-all duration-700`} style={{ width: `${sla.rate}%` }} />
+            </div>
+            <div className="flex justify-between mt-2 text-xs">
+              <span className="text-green-600 font-medium">✓ {sla.onTime} a tiempo</span>
+              <span className="text-red-500 font-medium">⚠ {sla.late} fuera de SLA</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MonthlyChart({ data }: { data: DashboardStats['completedByMonth'] }) {
+  const max = Math.max(...data.map(d => d.total), 1)
+
+  return (
+    <div className="bg-white rounded-xl border p-5 shadow-sm">
+      <h3 className="font-semibold text-gray-800 mb-4 text-sm uppercase tracking-wide">Entregas por Mes</h3>
+      {data.length === 0 ? (
+        <p className="text-gray-400 text-sm text-center py-6">Sin datos de entregas aún</p>
+      ) : (
+        <>
+          <div className="flex items-end gap-2 h-28">
+            {data.map(d => {
+              const late        = d.total - d.onTime
+              const heightPct   = Math.max((d.total / max) * 100, 4)
+              const onTimePct   = d.total > 0 ? (d.onTime / d.total) * 100 : 0
+              const latePct     = 100 - onTimePct
+              return (
+                <div key={d.month} className="flex-1 flex flex-col items-center gap-1">
+                  <span className="text-[9px] text-gray-500 font-semibold">{d.total}</span>
+                  <div
+                    className="w-full flex flex-col-reverse overflow-hidden rounded"
+                    style={{ height: `${heightPct}%` }}
+                  >
+                    <div className="bg-green-500" style={{ height: `${onTimePct}%` }} />
+                    {late > 0 && <div className="bg-red-400" style={{ height: `${latePct}%` }} />}
+                  </div>
+                  <span className="text-[9px] text-gray-400 text-center leading-tight">{d.month}</span>
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <div className="w-3 h-3 rounded-sm bg-green-500" /> A tiempo
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <div className="w-3 h-3 rounded-sm bg-red-400" /> Fuera de SLA
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Main component ───────────────────────────────────────────────────────────
+
 export default function DashboardView() {
   const { stats, loading, reload } = useDashboardData()
 
@@ -64,9 +143,9 @@ export default function DashboardView() {
   ]
 
   const typeItems = [
-    { label: '💻 Development',  value: stats.byType.development,  color: 'bg-blue-500' },
+    { label: '💻 Development',    value: stats.byType.development,   color: 'bg-blue-500' },
     { label: '📋 Administrative', value: stats.byType.administrative, color: 'bg-purple-500' },
-    { label: '🔀 Dual',         value: stats.byType.dual,         color: 'bg-indigo-400' },
+    { label: '🔀 Dual',           value: stats.byType.dual,          color: 'bg-indigo-400' },
   ]
 
   const areaItems = Object.entries(stats.byArea)
@@ -75,6 +154,9 @@ export default function DashboardView() {
       const colors = ['bg-blue-500', 'bg-purple-500', 'bg-teal-500', 'bg-orange-500', 'bg-pink-500']
       return { label, value, color: colors[i % colors.length] }
     })
+
+  const cycleLabel = stats.sla.avgCycleTime !== null ? `${stats.sla.avgCycleTime}d` : '—'
+  const leadLabel  = stats.sla.avgLeadTime  !== null ? `${stats.sla.avgLeadTime}d`  : '—'
 
   return (
     <div className="space-y-6">
@@ -92,9 +174,9 @@ export default function DashboardView() {
         </button>
       </div>
 
-      {/* Stat Cards */}
+      {/* Stat Cards — proyectos */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <StatCard label="Total"       value={stats.total}            icon="📊" color="border-blue-500" />
+        <StatCard label="Total"       value={stats.total}             icon="📊" color="border-blue-500" />
         <StatCard label="Activos"     value={stats.byStatus.active}   icon="🟢" color="border-green-500" />
         <StatCard label="Completados" value={stats.byStatus.completed} icon="✅" color="border-emerald-500" />
         <StatCard label="Archivados"  value={stats.byStatus.archived}  icon="📦" color="border-gray-400" />
@@ -102,10 +184,35 @@ export default function DashboardView() {
         <StatCard label="Vencidos"    value={stats.overdue}            icon="⚠️" color="border-orange-500" />
       </div>
 
-      {/* Charts */}
+      {/* Stat Cards — métricas de tiempo */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className={`bg-white rounded-xl border-l-4 p-5 shadow-sm ${
+          stats.sla.total === 0 ? 'border-gray-300' :
+          stats.sla.rate >= 80 ? 'border-green-500' :
+          stats.sla.rate >= 60 ? 'border-yellow-400' : 'border-red-500'
+        }`}>
+          <div className="flex items-center gap-4">
+            <span className="text-3xl">🎯</span>
+            <div>
+              <p className={`text-3xl font-bold ${
+                stats.sla.total === 0 ? 'text-gray-400' :
+                stats.sla.rate >= 80 ? 'text-green-600' :
+                stats.sla.rate >= 60 ? 'text-yellow-500' : 'text-red-500'
+              }`}>
+                {stats.sla.total === 0 ? '—' : `${stats.sla.rate}%`}
+              </p>
+              <p className="text-sm text-gray-500 mt-0.5">Cumplimiento SLA</p>
+            </div>
+          </div>
+        </div>
+        <StatCard label="Cycle Time promedio" value={cycleLabel} icon="🔄" color="border-blue-400" />
+        <StatCard label="Lead Time promedio"  value={leadLabel}  icon="📦" color="border-purple-400" />
+      </div>
+
+      {/* Charts — distribución */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <HBarChart title="Por Prioridad" items={priorityItems} />
-        <HBarChart title="Por Tipo" items={typeItems} />
+        <HBarChart title="Por Tipo"      items={typeItems} />
         {areaItems.length > 0
           ? <HBarChart title="Por Área" items={areaItems} />
           : (
@@ -114,6 +221,12 @@ export default function DashboardView() {
             </div>
           )
         }
+      </div>
+
+      {/* SLA breakdown + Tendencia mensual */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <SLABreakdown sla={stats.sla} />
+        <MonthlyChart data={stats.completedByMonth} />
       </div>
 
       {/* Status breakdown */}
