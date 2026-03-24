@@ -12,9 +12,10 @@ interface Props {
   onProjectClick: (item: { project: Project; flow: ProjectFlow }) => void
   users?: User[]
   tags?: Tag[]
+  onAssign?: (flowId: string, userId: string) => void
 }
 
-export default function BoardColumn({ phase, projects, onProjectClick, users = [], tags = [] }: Props) {
+export default function BoardColumn({ phase, projects, onProjectClick, users = [], tags = [], onAssign }: Props) {
   return (
     <div className="flex-shrink-0 w-80">
       {/* Column Header */}
@@ -58,6 +59,7 @@ export default function BoardColumn({ phase, projects, onProjectClick, users = [
                       onClick={() => onProjectClick(item)}
                       users={users}
                       tags={tags}
+                      onAssign={onAssign}
                     />
                   </div>
                 )}

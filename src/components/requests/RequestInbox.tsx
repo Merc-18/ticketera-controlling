@@ -28,9 +28,12 @@ function TypeChips({ request }: { request: Request }) {
   )
 }
 
+type InboxTab = 'pending' | 'approved' | 'rejected'
+
 export default function RequestInbox() {
   const { requests, loading, approveRequest, rejectRequest } = useRequests()
   const { activeUsers } = useUsers()
+  const [activeTab, setActiveTab] = useState<InboxTab>('pending')
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null)
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [showApproveModal, setShowApproveModal] = useState(false)
@@ -124,76 +127,173 @@ export default function RequestInbox() {
     <div className="space-y-6">
       {/* Tabs */}
       <div className="flex gap-2 border-b">
-        <button className="px-4 py-2 border-b-2 border-primary text-primary font-medium">
-          Pendientes ({pendingRequests.length})
-        </button>
-        <button className="px-4 py-2 text-gray-600 hover:text-gray-900">
-          Aprobadas ({approvedRequests.length})
-        </button>
-        <button className="px-4 py-2 text-gray-600 hover:text-gray-900">
-          Rechazadas ({rejectedRequests.length})
-        </button>
+        {([
+          { key: 'pending',  label: 'Pendientes',  count: pendingRequests.length,  dot: 'bg-yellow-400' },
+          { key: 'approved', label: 'Aprobadas',   count: approvedRequests.length, dot: 'bg-green-500' },
+          { key: 'rejected', label: 'Rechazadas',  count: rejectedRequests.length, dot: 'bg-red-500' },
+        ] as const).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition flex items-center gap-2 ${
+              activeTab === tab.key
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${tab.dot}`} />
+            {tab.label}
+            <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
+              activeTab === tab.key ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500'
+            }`}>
+              {tab.count}
+            </span>
+          </button>
+        ))}
       </div>
 
       {/* Request List */}
       <div className="grid gap-4">
-        {pendingRequests.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-lg">
-            <p className="text-gray-500">No hay solicitudes pendientes</p>
-          </div>
-        ) : (
-          pendingRequests.map(request => {
-            const urgent = isUrgent(request)
-            return (
+        {/* ── Pendientes ── */}
+        {activeTab === 'pending' && (
+          pendingRequests.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <p className="text-4xl mb-3">🎉</p>
+              <p className="text-gray-500 font-medium">No hay solicitudes pendientes</p>
+            </div>
+          ) : (
+            pendingRequests.map(request => {
+              const urgent = isUrgent(request)
+              return (
+                <div
+                  key={request.id}
+                  className={`bg-white border rounded-lg p-4 hover:shadow-md transition cursor-pointer ${urgent ? 'border-red-300' : ''}`}
+                  onClick={() => setSelectedRequest(request)}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="font-mono font-bold text-primary">{request.request_number}</p>
+                        {urgent && (
+                          <span className="px-2 py-0.5 bg-red-100 text-red-700 border border-red-200 rounded-full text-xs font-bold">
+                            🔴 URGENTE
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-semibold text-gray-900">{request.requester_name}</p>
+                      <p className="text-sm text-gray-600">{request.requester_area}</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium border ${statusColors[request.status]}`}>
+                      Pendiente
+                    </span>
+                  </div>
+                  <div className="mb-2"><TypeChips request={request} /></div>
+                  <p className="text-sm text-gray-600 line-clamp-2">{request.description}</p>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openApproveModal(request) }}
+                      disabled={actionLoading}
+                      className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition disabled:opacity-50"
+                    >
+                      ✓ Aprobar
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSelectedRequest(request); setShowRejectModal(true) }}
+                      disabled={actionLoading}
+                      className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition disabled:opacity-50"
+                    >
+                      ✕ Rechazar
+                    </button>
+                  </div>
+                </div>
+              )
+            })
+          )
+        )}
+
+        {/* ── Aprobadas ── */}
+        {activeTab === 'approved' && (
+          approvedRequests.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <p className="text-gray-500">No hay solicitudes aprobadas</p>
+            </div>
+          ) : (
+            approvedRequests.map(request => {
+              const urgent = isUrgent(request)
+              return (
+                <div
+                  key={request.id}
+                  className="bg-white border border-green-100 rounded-lg p-4 hover:shadow-md transition cursor-pointer"
+                  onClick={() => setSelectedRequest(request)}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="font-mono font-bold text-primary">{request.request_number}</p>
+                        {urgent && (
+                          <span className="px-2 py-0.5 bg-red-100 text-red-700 border border-red-200 rounded-full text-xs font-bold">
+                            🔴 URGENTE
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-semibold text-gray-900">{request.requester_name}</p>
+                      <p className="text-sm text-gray-600">{request.requester_area}</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium border ${statusColors.approved}`}>
+                      ✅ Aprobado
+                    </span>
+                  </div>
+                  <div className="mb-2"><TypeChips request={request} /></div>
+                  <p className="text-sm text-gray-600 line-clamp-2">{request.description}</p>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Recibido: {new Date(request.created_at).toLocaleDateString('es-PE')}
+                    {request.requested_date && (
+                      <span> · SLA: {new Date(request.requested_date + 'T12:00:00').toLocaleDateString('es-PE')}</span>
+                    )}
+                  </p>
+                </div>
+              )
+            })
+          )
+        )}
+
+        {/* ── Rechazadas ── */}
+        {activeTab === 'rejected' && (
+          rejectedRequests.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <p className="text-gray-500">No hay solicitudes rechazadas</p>
+            </div>
+          ) : (
+            rejectedRequests.map(request => (
               <div
                 key={request.id}
-                className={`bg-white border rounded-lg p-4 hover:shadow-md transition cursor-pointer ${
-                  urgent ? 'border-red-300' : ''
-                }`}
+                className="bg-white border border-red-100 rounded-lg p-4 hover:shadow-md transition cursor-pointer"
                 onClick={() => setSelectedRequest(request)}
               >
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <p className="font-mono font-bold text-primary">{request.request_number}</p>
-                      {urgent && (
-                        <span className="px-2 py-0.5 bg-red-100 text-red-700 border border-red-200 rounded-full text-xs font-bold">
-                          🔴 URGENTE
-                        </span>
-                      )}
-                    </div>
+                    <p className="font-mono font-bold text-primary">{request.request_number}</p>
                     <p className="font-semibold text-gray-900">{request.requester_name}</p>
                     <p className="text-sm text-gray-600">{request.requester_area}</p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium border ${statusColors[request.status]}`}>
-                    Pendiente
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium border ${statusColors.rejected}`}>
+                    ❌ Rechazado
                   </span>
                 </div>
-
-                <div className="mb-2">
-                  <TypeChips request={request} />
-                </div>
+                <div className="mb-2"><TypeChips request={request} /></div>
                 <p className="text-sm text-gray-600 line-clamp-2">{request.description}</p>
-
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); openApproveModal(request) }}
-                    disabled={actionLoading}
-                    className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition disabled:opacity-50"
-                  >
-                    ✓ Aprobar
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setSelectedRequest(request); setShowRejectModal(true) }}
-                    disabled={actionLoading}
-                    className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition disabled:opacity-50"
-                  >
-                    ✕ Rechazar
-                  </button>
-                </div>
+                {request.rejection_reason && (
+                  <div className="mt-2 bg-red-50 border border-red-100 rounded px-3 py-2">
+                    <p className="text-xs text-red-600 font-medium mb-0.5">Razón del rechazo:</p>
+                    <p className="text-xs text-red-800 line-clamp-2">{request.rejection_reason}</p>
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 mt-2">
+                  Recibido: {new Date(request.created_at).toLocaleDateString('es-PE')}
+                </p>
               </div>
-            )
-          })
+            ))
+          )
         )}
       </div>
 

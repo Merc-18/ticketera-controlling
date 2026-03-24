@@ -275,6 +275,7 @@ export default function KanbanBoard({ boardType }: Props) {
                 projects={getProjectsByPhase(phase.id)}
                 onProjectClick={setSelectedProject}
                 users={activeUsers}
+                onAssign={(flowId, userId) => updateFlowDetails(flowId, { assigned_to: userId }).then(reload)}
               />
             ))}
           </div>

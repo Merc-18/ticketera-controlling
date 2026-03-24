@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react'
 import type { Project, ProjectFlow, User, Tag } from '../../types/database.types'
 
 interface ProjectWithArea extends Project {
@@ -10,6 +11,7 @@ interface Props {
   onClick: () => void
   users?: User[]
   tags?: Tag[]
+  onAssign?: (flowId: string, userId: string) => void
 }
 
 const AVATAR_COLORS = [
@@ -50,11 +52,25 @@ function getDueDateBadge(dueDate?: string | null) {
   return { label: new Date(dueDate + 'T00:00:00').toLocaleDateString('es-PE', { day: '2-digit', month: 'short' }), cls: 'bg-gray-100 text-gray-500 border border-gray-200' }
 }
 
-export default function ProjectCard({ project, flow, onClick, users = [], tags = [] }: Props) {
+export default function ProjectCard({ project, flow, onClick, users = [], tags = [], onAssign }: Props) {
   const area = project.requests?.requester_area
   const requestNumber = project.requests?.request_number
   const areaColorClass = area ? (AREA_COLORS[area] ?? 'bg-gray-100 text-gray-600') : ''
   const dueBadge = getDueDateBadge(project.due_date)
+  const [showAssign, setShowAssign] = useState(false)
+  const assignRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!showAssign) return
+    const handler = (e: MouseEvent) => {
+      if (assignRef.current && !assignRef.current.contains(e.target as Node)) {
+        setShowAssign(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showAssign])
 
   // Collect all assigned users across all flows (for dual projects, show both)
   const allFlows: Array<{ assigned_to: string | null; flow_type: string }> =
@@ -63,7 +79,6 @@ export default function ProjectCard({ project, flow, onClick, users = [], tags =
     .filter(f => f.assigned_to)
     .map(f => ({ user: users.find(u => u.id === f.assigned_to), flowType: f.flow_type }))
     .filter((x): x is { user: NonNullable<typeof x.user>; flowType: string } => Boolean(x.user))
-    // deduplicate by user id
     .filter((x, i, arr) => arr.findIndex(y => y.user.id === x.user.id) === i)
 
   return (
@@ -113,22 +128,63 @@ export default function ProjectCard({ project, flow, onClick, users = [], tags =
           )}
           {new Date(project.updated_at).toLocaleDateString('es-PE')}
         </span>
-        {assignedUsers.length > 0 ? (
-          <div className="flex items-center gap-1">
-            {assignedUsers.map(({ user, flowType }) => (
-              <div key={user.id} className="flex items-center gap-1" title={`${user.full_name} (${flowType === 'development' ? '💻' : '📋'})`}>
-                <div className={`w-5 h-5 rounded-full ${getAvatarColor(user.full_name)} flex items-center justify-center text-white text-[9px] font-bold`}>
-                  {getInitials(user.full_name)}
+
+        <div className="flex items-center gap-1.5">
+          {/* Assigned users display */}
+          {assignedUsers.length > 0 ? (
+            <div className="flex items-center gap-1">
+              {assignedUsers.map(({ user, flowType }) => (
+                <div key={user.id} className="flex items-center gap-1" title={`${user.full_name} (${flowType === 'development' ? '💻' : '📋'})`}>
+                  <div className={`w-5 h-5 rounded-full ${getAvatarColor(user.full_name)} flex items-center justify-center text-white text-[9px] font-bold`}>
+                    {getInitials(user.full_name)}
+                  </div>
                 </div>
-              </div>
-            ))}
-            {assignedUsers.length === 1 && (
-              <span className="text-gray-500 truncate max-w-[80px]">{assignedUsers[0].user.full_name.split(' ')[0]}</span>
-            )}
-          </div>
-        ) : flow.assigned_to ? (
-          <span>👤 Asignado</span>
-        ) : null}
+              ))}
+              {assignedUsers.length === 1 && (
+                <span className="text-gray-500 truncate max-w-[70px]">{assignedUsers[0].user.full_name.split(' ')[0]}</span>
+              )}
+            </div>
+          ) : null}
+
+          {/* Quick assign button */}
+          {onAssign && users.length > 0 && (
+            <div className="relative" ref={assignRef}>
+              <button
+                onClick={e => { e.stopPropagation(); setShowAssign(v => !v) }}
+                title="Asignar responsable"
+                className="w-5 h-5 rounded-full bg-gray-100 hover:bg-blue-100 text-gray-400 hover:text-blue-600 flex items-center justify-center text-[10px] font-bold transition"
+              >
+                {assignedUsers.length > 0 ? '✎' : '+'}
+              </button>
+
+              {showAssign && (
+                <div
+                  className="absolute bottom-7 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 min-w-[160px]"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <p className="px-3 py-1 text-[10px] text-gray-400 font-semibold uppercase tracking-wide border-b border-gray-100 mb-1">
+                    Asignar responsable
+                  </p>
+                  {users.map(u => (
+                    <button
+                      key={u.id}
+                      onClick={() => { onAssign(flow.id, u.id); setShowAssign(false) }}
+                      className={`w-full text-left px-3 py-1.5 text-xs text-gray-800 hover:bg-blue-50 flex items-center gap-2 transition ${
+                        flow.assigned_to === u.id ? 'bg-blue-50 text-blue-700 font-medium' : ''
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full ${getAvatarColor(u.full_name)} flex items-center justify-center text-white text-[9px] font-bold shrink-0`}>
+                        {getInitials(u.full_name)}
+                      </div>
+                      {u.full_name.split(' ').slice(0, 2).join(' ')}
+                      {flow.assigned_to === u.id && <span className="ml-auto">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -20,24 +20,32 @@ export interface DashboardStats {
   completedByMonth: { month: string; total: number; onTime: number }[]
 }
 
-export function useDashboardData() {
+export function useDashboardData(periodDays: number | null = null) {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [periodDays])
 
   async function load() {
     setLoading(true)
+
+    // SLA logs: filter by period if specified
+    let slaQuery = supabase
+      .from('activity_logs')
+      .select('details, created_at')
+      .eq('action', 'sla_completed')
+      .order('created_at', { ascending: true })
+
+    if (periodDays !== null) {
+      const since = new Date(Date.now() - periodDays * 86400000).toISOString()
+      slaQuery = slaQuery.gte('created_at', since)
+    }
 
     const [{ data: projects }, { data: slaLogs }] = await Promise.all([
       supabase
         .from('projects')
         .select('status, priority, project_type, is_blocked, due_date, requests(requester_area)'),
-      supabase
-        .from('activity_logs')
-        .select('details, created_at')
-        .eq('action', 'sla_completed')
-        .order('created_at', { ascending: true }),
+      slaQuery,
     ])
 
     // ── Projects stats ──────────────────────────────────────────────
@@ -66,7 +74,7 @@ export function useDashboardData() {
 
     for (const log of slaLogs ?? []) {
       const d = log.details as any
-      const month = (log.created_at as string).slice(0, 7) // YYYY-MM
+      const month = (log.created_at as string).slice(0, 7)
 
       if (d?.on_time === true) onTime++
       else if (d?.on_time === false) late++
@@ -87,7 +95,7 @@ export function useDashboardData() {
 
     const completedByMonth = Object.entries(monthMap)
       .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-6) // last 6 months
+      .slice(-6)
       .map(([month, v]) => ({
         month: new Date(month + '-15').toLocaleDateString('es-PE', { month: 'short', year: '2-digit' }),
         ...v,

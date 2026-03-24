@@ -1,4 +1,60 @@
+import { useState } from 'react'
+import { supabase } from '../../lib/supabase'
 import { useDashboardData, type DashboardStats } from '../../hooks/useDashboardData'
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+async function exportCompletedCSV() {
+  const { data: projects } = await supabase
+    .from('projects')
+    .select('id, title, priority, project_type, start_date, updated_at, requests(requester_area)')
+    .eq('status', 'completed')
+    .order('updated_at', { ascending: false })
+
+  if (!projects?.length) { alert('No hay proyectos completados para exportar.'); return }
+
+  const ids = projects.map(p => p.id)
+  const { data: slaLogs } = await supabase
+    .from('activity_logs')
+    .select('project_id, details')
+    .eq('action', 'sla_completed')
+    .in('project_id', ids)
+
+  const slaMap: Record<string, any> = {}
+  for (const l of slaLogs ?? []) slaMap[l.project_id] = l.details
+
+  const PRIORITY_ES: Record<string, string> = { urgent: 'Urgente', high: 'Alta', medium: 'Media', low: 'Baja' }
+  const TYPE_ES: Record<string, string> = { development: 'Desarrollo', administrative: 'Administrativo', dual: 'Dual' }
+
+  const headers = ['Proyecto', 'Área', 'Prioridad', 'Tipo', 'Fecha Inicio', 'Fecha Completado', 'Cycle Time (d)', 'Lead Time (d)', 'SLA Vencimiento', 'A Tiempo']
+  const rows = projects.map(p => {
+    const sla = slaMap[p.id] ?? {}
+    return [
+      p.title,
+      (p as any).requests?.requester_area ?? '',
+      PRIORITY_ES[p.priority] ?? p.priority,
+      TYPE_ES[p.project_type] ?? p.project_type,
+      p.start_date ?? '',
+      (p.updated_at as string)?.slice(0, 10) ?? '',
+      sla.cycle_time_days ?? sla.days_elapsed ?? '',
+      sla.lead_time_days ?? '',
+      sla.due_date ?? '',
+      sla.on_time === true ? 'Sí' : sla.on_time === false ? 'No' : '',
+    ]
+  })
+
+  const csv = [headers, ...rows]
+    .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `proyectos-completados-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 // ── Reusable components ──────────────────────────────────────────────────────
 
@@ -79,22 +135,19 @@ function MonthlyChart({ data }: { data: DashboardStats['completedByMonth'] }) {
     <div className="bg-white rounded-xl border p-5 shadow-sm">
       <h3 className="font-semibold text-gray-800 mb-4 text-sm uppercase tracking-wide">Entregas por Mes</h3>
       {data.length === 0 ? (
-        <p className="text-gray-400 text-sm text-center py-6">Sin datos de entregas aún</p>
+        <p className="text-gray-400 text-sm text-center py-6">Sin datos en el período seleccionado</p>
       ) : (
         <>
           <div className="flex items-end gap-2 h-28">
             {data.map(d => {
-              const late        = d.total - d.onTime
-              const heightPct   = Math.max((d.total / max) * 100, 4)
-              const onTimePct   = d.total > 0 ? (d.onTime / d.total) * 100 : 0
-              const latePct     = 100 - onTimePct
+              const late      = d.total - d.onTime
+              const heightPct = Math.max((d.total / max) * 100, 4)
+              const onTimePct = d.total > 0 ? (d.onTime / d.total) * 100 : 0
+              const latePct   = 100 - onTimePct
               return (
                 <div key={d.month} className="flex-1 flex flex-col items-center gap-1">
                   <span className="text-[9px] text-gray-500 font-semibold">{d.total}</span>
-                  <div
-                    className="w-full flex flex-col-reverse overflow-hidden rounded"
-                    style={{ height: `${heightPct}%` }}
-                  >
+                  <div className="w-full flex flex-col-reverse overflow-hidden rounded" style={{ height: `${heightPct}%` }}>
                     <div className="bg-green-500" style={{ height: `${onTimePct}%` }} />
                     {late > 0 && <div className="bg-red-400" style={{ height: `${latePct}%` }} />}
                   </div>
@@ -119,8 +172,22 @@ function MonthlyChart({ data }: { data: DashboardStats['completedByMonth'] }) {
 
 // ── Main component ───────────────────────────────────────────────────────────
 
+const PERIOD_OPTIONS = [
+  { value: 30,   label: 'Últimos 30d' },
+  { value: 90,   label: 'Últimos 90d' },
+  { value: null, label: 'Todo el tiempo' },
+] as const
+
 export default function DashboardView() {
-  const { stats, loading, reload } = useDashboardData()
+  const [period, setPeriod] = useState<number | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const { stats, loading, reload } = useDashboardData(period)
+
+  const handleExport = async () => {
+    setExporting(true)
+    try { await exportCompletedCSV() }
+    finally { setExporting(false) }
+  }
 
   if (loading) {
     return (
@@ -161,20 +228,45 @@ export default function DashboardView() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">📈 Dashboard</h2>
           <p className="text-sm text-gray-500 mt-1">Resumen general de todos los proyectos</p>
         </div>
-        <button
-          onClick={reload}
-          className="px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition shadow-sm"
-        >
-          ↺ Actualizar
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Filtro de período */}
+          <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-1">
+            {PERIOD_OPTIONS.map(opt => (
+              <button
+                key={String(opt.value)}
+                onClick={() => setPeriod(opt.value)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
+                  period === opt.value
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition shadow-sm disabled:opacity-50 flex items-center gap-2"
+          >
+            {exporting ? '⏳ Exportando...' : '⬇ Exportar CSV'}
+          </button>
+          <button
+            onClick={reload}
+            className="px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition shadow-sm"
+          >
+            ↺ Actualizar
+          </button>
+        </div>
       </div>
 
-      {/* Stat Cards — proyectos */}
+      {/* Stat Cards — proyectos (siempre todo el tiempo) */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard label="Total"       value={stats.total}             icon="📊" color="border-blue-500" />
         <StatCard label="Activos"     value={stats.byStatus.active}   icon="🟢" color="border-green-500" />
@@ -184,7 +276,7 @@ export default function DashboardView() {
         <StatCard label="Vencidos"    value={stats.overdue}            icon="⚠️" color="border-orange-500" />
       </div>
 
-      {/* Stat Cards — métricas de tiempo */}
+      {/* Stat Cards — métricas de tiempo (filtradas por período) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className={`bg-white rounded-xl border-l-4 p-5 shadow-sm ${
           stats.sla.total === 0 ? 'border-gray-300' :
