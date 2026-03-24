@@ -44,8 +44,6 @@ export interface Project {
   project_type: 'development' | 'administrative' | 'dual';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   status: 'active' | 'completed' | 'archived';
-  estimated_hours?: number;
-  actual_hours?: number;
   start_date?: string;
   due_date?: string;
   is_blocked: boolean;

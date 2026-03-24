@@ -104,7 +104,7 @@ export function useProjects() {
         await logActivity(projectId, 'unblocked', {})
       } else if (updates.priority && current?.priority !== updates.priority) {
         await logActivity(projectId, 'priority_changed', { from: current?.priority, to: updates.priority })
-      } else if (updates.title || updates.description || updates.estimated_hours !== undefined || updates.actual_hours !== undefined) {
+      } else if (updates.title || updates.description) {
         const changed = Object.keys(updates).filter(k => k !== 'updated_at')
         await logActivity(projectId, 'edited', { fields: changed })
       }
@@ -187,7 +187,6 @@ export function useProjects() {
     description: string
     project_type: 'development' | 'administrative' | 'dual'
     priority: 'low' | 'medium' | 'high' | 'urgent'
-    estimated_hours?: number
     start_date?: string
     due_date?: string
   }) => {
@@ -207,7 +206,6 @@ export function useProjects() {
           status: 'active',
           is_blocked: false,
           tag_ids: autoTagIds,
-          estimated_hours: projectData.estimated_hours || null,
           start_date: projectData.start_date || null,
           due_date: projectData.due_date || null,
         }])

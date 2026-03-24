@@ -103,7 +103,6 @@ export default function TableView({ projects, boardType, onProjectClick }: Props
               <SortHeader k="area"       label="Área" />
               <SortHeader k="phase"      label="Fase" />
               <SortHeader k="progress"   label="Progreso" />
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Horas</th>
               <SortHeader k="due_date"   label="Vencimiento" />
               <SortHeader k="created_at" label="Creado" />
             </tr>
@@ -154,13 +153,6 @@ export default function TableView({ projects, boardType, onProjectClick }: Props
                       </div>
                       <span className="text-xs font-semibold text-gray-700">{flow.progress}%</span>
                     </div>
-                  </td>
-
-                  {/* Horas */}
-                  <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600">
-                    {project.estimated_hours != null || project.actual_hours != null ? (
-                      <span>{project.actual_hours ?? '—'} / {project.estimated_hours ?? '—'} h</span>
-                    ) : <span className="text-gray-300">—</span>}
                   </td>
 
                   {/* Vencimiento */}

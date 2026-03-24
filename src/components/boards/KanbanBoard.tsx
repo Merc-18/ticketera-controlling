@@ -208,7 +208,7 @@ export default function KanbanBoard({ boardType }: Props) {
             {hasFilters && (
               <>
                 <button
-                  onClick={() => { setPriorityFilter('all'); setAreaFilter('all'); setTagFilter('all'); setMyProjectsOnly(false) }}
+                  onClick={() => { setPriorityFilter('all'); setAreaFilter('all'); setMyProjectsOnly(false) }}
                   className="px-3 py-1.5 rounded-full text-sm font-medium border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition"
                 >
                   ✕ Limpiar
