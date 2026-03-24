@@ -123,9 +123,10 @@ export default function ProjectCard({ project, flow, onClick, users = [], tags =
       {/* Footer */}
       <div className="flex items-center justify-between text-xs text-gray-400">
         <span>
-          {requestNumber && (
-            <span className="font-mono text-gray-500 mr-1.5">{requestNumber}</span>
-          )}
+          {requestNumber
+            ? <span className="font-mono text-gray-500 mr-1.5">{requestNumber}</span>
+            : <span className="mr-1.5 px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 text-[10px] font-medium">Interno</span>
+          }
           {new Date(project.updated_at).toLocaleDateString('es-PE')}
         </span>
 

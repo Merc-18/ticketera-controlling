@@ -8,7 +8,6 @@ interface Props {
     description: string
     project_type: 'development' | 'administrative' | 'dual'
     priority: 'low' | 'medium' | 'high' | 'urgent'
-    estimated_hours?: number
     start_date?: string
     due_date?: string
   }) => Promise<void>
@@ -32,7 +31,6 @@ export default function NewProjectModal({ boardType, onClose, onCreate }: Props)
   const [description, setDescription] = useState('')
   const [projectType, setProjectType] = useState<'development' | 'administrative' | 'dual'>(boardType)
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium')
-  const [estimatedHours, setEstimatedHours] = useState('')
   const [startDate, setStartDate] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [saving, setSaving] = useState(false)
@@ -48,7 +46,6 @@ export default function NewProjectModal({ boardType, onClose, onCreate }: Props)
         description,
         project_type: projectType,
         priority,
-        estimated_hours: estimatedHours ? Number(estimatedHours) : undefined,
         start_date: startDate || undefined,
         due_date: dueDate || undefined,
       })
@@ -125,19 +122,6 @@ export default function NewProjectModal({ boardType, onClose, onCreate }: Props)
                 ))}
               </select>
             </div>
-          </div>
-
-          {/* Horas estimadas */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Horas estimadas</label>
-            <input
-              type="number"
-              min="0"
-              value={estimatedHours}
-              onChange={e => setEstimatedHours(e.target.value)}
-              placeholder="Ej: 40"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            />
           </div>
 
           {/* Fechas */}
