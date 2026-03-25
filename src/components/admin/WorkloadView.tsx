@@ -31,24 +31,18 @@ const PRIORITY_LABEL: Record<string, string> = {
   urgent: '🔴 Urgente', high: '🟠 Alta', medium: '🟡 Media', low: '🟢 Baja',
 }
 
-const AVATAR_COLORS = [
-  'bg-blue-500', 'bg-purple-500', 'bg-green-500',
-  'bg-orange-500', 'bg-pink-500', 'bg-teal-500', 'bg-indigo-500',
-]
 
-function getAvatarColor(name: string) {
-  let hash = 0
-  for (const c of name) hash = c.charCodeAt(0) + ((hash << 5) - hash)
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
-}
-
-function getInitials(name: string) {
-  return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
-}
 
 function isOverdue(dueDate: string | null) {
   if (!dueDate) return false
   return dueDate < new Date().toISOString().slice(0, 10)
+}
+
+interface UserMetrics {
+  completed: number
+  avgCycleTime: number | null
+  onTime: number
+  late: number
 }
 
 export default function WorkloadView() {
@@ -56,10 +50,58 @@ export default function WorkloadView() {
   const [flows, setFlows]     = useState<FlowWithProject[]>([])
   const [flowsLoading, setFlowsLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [userMetrics, setUserMetrics] = useState<Record<string, UserMetrics>>({})
 
   useEffect(() => {
     loadFlows()
+    loadMetrics()
   }, [])
+
+  const loadMetrics = async () => {
+    // Fetch completed project_flows grouped by assigned_to
+    const { data: completedFlows } = await supabase
+      .from('project_flows')
+      .select('assigned_to, project_id')
+      .not('assigned_to', 'is', null)
+
+    if (!completedFlows?.length) return
+
+    // Fetch sla_completed logs for those projects
+    const projectIds = [...new Set(completedFlows.map(f => f.project_id))]
+    const { data: slaLogs } = await supabase
+      .from('activity_logs')
+      .select('project_id, details')
+      .eq('action', 'sla_completed')
+      .in('project_id', projectIds)
+
+    if (!slaLogs) return
+
+    const slaByProject: Record<string, any> = {}
+    for (const log of slaLogs) slaByProject[log.project_id] = log.details
+
+    const metricsMap: Record<string, { cycleTimes: number[]; onTime: number; late: number }> = {}
+
+    for (const flow of completedFlows) {
+      const sla = slaByProject[flow.project_id]
+      if (!sla) continue // skip flows without completed SLA (project still active)
+      const uid = flow.assigned_to!
+      if (!metricsMap[uid]) metricsMap[uid] = { cycleTimes: [], onTime: 0, late: 0 }
+      const ct = sla.cycle_time_days ?? sla.days_elapsed
+      if (ct !== undefined) metricsMap[uid].cycleTimes.push(Number(ct))
+      if (sla.on_time === true) metricsMap[uid].onTime++
+      else if (sla.on_time === false) metricsMap[uid].late++
+    }
+
+    const result: Record<string, UserMetrics> = {}
+    for (const [uid, m] of Object.entries(metricsMap)) {
+      const completed = m.onTime + m.late
+      const avgCycleTime = m.cycleTimes.length > 0
+        ? Math.round(m.cycleTimes.reduce((a, b) => a + b, 0) / m.cycleTimes.length)
+        : null
+      result[uid] = { completed, avgCycleTime, onTime: m.onTime, late: m.late }
+    }
+    setUserMetrics(result)
+  }
 
   const loadFlows = async () => {
     setFlowsLoading(true)
@@ -174,6 +216,7 @@ export default function WorkloadView() {
               avgProgress={avgProgress}
               blockedCount={blockedCount}
               overdueCount={overdueLocal}
+              metrics={userMetrics[user.id] ?? null}
               isExpanded={isExpanded}
               onToggle={() => setExpanded(isExpanded ? null : user.id)}
             />
@@ -203,7 +246,7 @@ export default function WorkloadView() {
 
 function UserCard({
   user, flows, projects, avgProgress,
-  blockedCount, overdueCount, isExpanded, onToggle,
+  blockedCount, overdueCount, metrics, isExpanded, onToggle,
 }: {
   user: User
   flows: FlowWithProject[]
@@ -211,6 +254,7 @@ function UserCard({
   avgProgress: number
   blockedCount: number
   overdueCount: number
+  metrics: UserMetrics | null
   isExpanded: boolean
   onToggle: () => void
 }) {
@@ -263,6 +307,26 @@ function UserCard({
                 className="h-2 rounded-full bg-primary transition-all duration-500"
                 style={{ width: `${avgProgress}%` }}
               />
+            </div>
+          </div>
+        )}
+
+        {/* Métricas históricas */}
+        {metrics && metrics.completed > 0 && (
+          <div className="mt-3 grid grid-cols-3 gap-2 text-center bg-gray-50 rounded-lg p-2">
+            <div>
+              <p className="text-sm font-bold text-gray-800">{metrics.completed}</p>
+              <p className="text-[10px] text-gray-400 leading-tight">completados</p>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-800">{metrics.avgCycleTime !== null ? `${metrics.avgCycleTime}d` : '—'}</p>
+              <p className="text-[10px] text-gray-400 leading-tight">cycle time prom.</p>
+            </div>
+            <div>
+              <p className={`text-sm font-bold ${metrics.completed > 0 && Math.round(metrics.onTime / metrics.completed * 100) >= 80 ? 'text-green-600' : 'text-orange-500'}`}>
+                {metrics.completed > 0 ? `${Math.round(metrics.onTime / metrics.completed * 100)}%` : '—'}
+              </p>
+              <p className="text-[10px] text-gray-400 leading-tight">SLA cumplido</p>
             </div>
           </div>
         )}

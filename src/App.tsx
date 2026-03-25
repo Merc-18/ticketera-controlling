@@ -12,7 +12,10 @@ import PublicLanding from './components/requests/PublicLanding'
 import RequestInbox from './components/requests/RequestInbox'
 import UserManagementPanel from './components/admin/UserManagementPanel'
 import WorkloadView from './components/admin/WorkloadView'
-import TagManagement from './components/admin/TagManagement'
+
+import PapeleraView from './components/admin/PapeleraView'
+import NotificationBell from './components/notifications/NotificationBell'
+import { usePendingCount } from './hooks/usePendingCount'
 
 function AdminClock() {
   const [time, setTime] = useState('')
@@ -27,7 +30,7 @@ function AdminClock() {
   return (
     <div className="text-right hidden sm:block">
       <p className="text-sm font-mono font-semibold text-gray-800">{time}</p>
-      <p className="text-xs text-gray-400">Lima GMT-5</p>
+      <p className="text-xs text-gray-400 whitespace-nowrap">Lima GMT-5</p>
     </div>
   )
 }
@@ -36,7 +39,8 @@ function Dashboard() {
   const { user, signOut } = useAuth()
   const [currentBoard, setCurrentBoard] = useState<'development' | 'administrative'>('development')
   const [currentTab, setCurrentTab]   = useState<'dashboard' | 'boards' | 'requests' | 'equipo'>('dashboard')
-  const [adminSubTab, setAdminSubTab] = useState<'usuarios' | 'carga' | 'tags'>('carga')
+  const [adminSubTab, setAdminSubTab] = useState<'usuarios' | 'carga' | 'papelera'>('carga')
+  const pendingCount = usePendingCount(user?.role === 'admin')
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -73,13 +77,18 @@ function Dashboard() {
                 </button>
                 <button
                   onClick={() => setCurrentTab('requests')}
-                  className={`px-4 py-2 rounded-md font-medium text-sm transition ${
+                  className={`px-4 py-2 rounded-md font-medium text-sm transition flex items-center gap-1.5 ${
                     currentTab === 'requests'
                       ? 'bg-white text-primary shadow-sm'
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
                   📬 Requests
+                  {pendingCount > 0 && (
+                    <span className="min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none">
+                      {pendingCount > 9 ? '9+' : pendingCount}
+                    </span>
+                  )}
                 </button>
                 {user?.role === 'admin' && (
                   <button
@@ -103,8 +112,11 @@ function Dashboard() {
                 />
               )}
               
-              {/* Reloj GMT-5 (solo admins) */}
-              {user?.role === 'admin' && <AdminClock />}
+              {/* Reloj + Campana */}
+              <div className="flex items-center gap-2">
+                {user?.role === 'admin' && <AdminClock />}
+                <NotificationBell />
+              </div>
 
               {/* User Info */}
               <div className="flex items-center gap-4">
@@ -129,17 +141,7 @@ function Dashboard() {
         {currentTab === 'dashboard' && <DashboardView />}
 
         {currentTab === 'boards' && (
-          <>
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
-                {currentBoard === 'development' ? '💻 Board Development' : '📋 Board Administrative'}
-              </h2>
-              <p className="text-gray-600 text-sm mt-1">
-                Arrastra y suelta los proyectos entre las columnas
-              </p>
-            </div>
-            <KanbanBoard boardType={currentBoard} />
-          </>
+          <KanbanBoard boardType={currentBoard} />
         )}
 
         {currentTab === 'requests' && (
@@ -187,21 +189,23 @@ function Dashboard() {
               >
                 🔑 Usuarios
               </button>
+
               <button
-                onClick={() => setAdminSubTab('tags')}
+                onClick={() => setAdminSubTab('papelera')}
                 className={`px-4 py-2 rounded-md font-medium text-sm transition ${
-                  adminSubTab === 'tags'
+                  adminSubTab === 'papelera'
                     ? 'bg-white text-primary shadow-sm'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                🏷️ Etiquetas
+                🗑 Papelera
               </button>
             </div>
 
             {adminSubTab === 'carga'    && <WorkloadView />}
             {adminSubTab === 'usuarios' && <UserManagementPanel />}
-            {adminSubTab === 'tags'     && <TagManagement />}
+
+            {adminSubTab === 'papelera' && <PapeleraView />}
           </>
         )}
       </div>

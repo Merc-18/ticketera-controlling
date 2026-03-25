@@ -20,11 +20,28 @@ export interface DashboardStats {
   completedByMonth: { month: string; total: number; onTime: number }[]
 }
 
-export function useDashboardData(periodDays: number | null = null) {
+export function useDashboardData(periodDays: number | null = null, areaFilter: string | null = null) {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { load() }, [periodDays])
+  useEffect(() => { load() }, [periodDays, areaFilter])
+
+  // Refresh when the browser tab becomes visible again
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [periodDays, areaFilter])
+
+  // Realtime: refresh when projects or SLA logs change
+  useEffect(() => {
+    const channel = supabase
+      .channel(`dashboard-realtime-${String(periodDays)}-${String(areaFilter)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_logs' }, () => load())
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [periodDays, areaFilter])
 
   async function load() {
     setLoading(true)
@@ -41,12 +58,17 @@ export function useDashboardData(periodDays: number | null = null) {
       slaQuery = slaQuery.gte('created_at', since)
     }
 
-    const [{ data: projects }, { data: slaLogs }] = await Promise.all([
+    const [{ data: rawProjects }, { data: slaLogs }] = await Promise.all([
       supabase
         .from('projects')
-        .select('status, priority, project_type, is_blocked, due_date, requests(requester_area)'),
+        .select('status, priority, project_type, is_blocked, due_date, requests(requester_area)')
+        .neq('status', 'deleted'),
       slaQuery,
     ])
+
+    const projects = areaFilter
+      ? (rawProjects ?? []).filter(p => (p as any).requests?.requester_area === areaFilter)
+      : (rawProjects ?? [])
 
     // ── Projects stats ──────────────────────────────────────────────
     const byStatus   = { active: 0, completed: 0, archived: 0 }
@@ -56,7 +78,7 @@ export function useDashboardData(periodDays: number | null = null) {
     let blocked = 0, overdue = 0
     const today = new Date().toISOString().slice(0, 10)
 
-    for (const p of projects ?? []) {
+    for (const p of projects) {
       byStatus[p.status as keyof typeof byStatus]++
       byPriority[p.priority as keyof typeof byPriority]++
       byType[p.project_type as keyof typeof byType]++
@@ -102,7 +124,7 @@ export function useDashboardData(periodDays: number | null = null) {
       }))
 
     setStats({
-      total: (projects ?? []).length,
+      total: projects.length,
       byStatus, byPriority, byArea, byType, blocked, overdue,
       sla: { total: slaTotal, onTime, late, rate: slaRate, avgCycleTime: avg(cycleTimes), avgLeadTime: avg(leadTimes) },
       completedByMonth,

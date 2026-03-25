@@ -4,6 +4,49 @@ import { useDashboardData, type DashboardStats } from '../../hooks/useDashboardD
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+async function exportActiveCSV() {
+  const { data: projects } = await supabase
+    .from('projects')
+    .select('title, priority, project_type, status, is_blocked, due_date, sla_target_date, created_at, requests(requester_area), project_flows(flow_type, current_phase, assigned_to)')
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+
+  if (!projects?.length) { alert('No hay proyectos activos para exportar.'); return }
+
+  const PRIORITY_ES: Record<string, string> = { urgent: 'Urgente', high: 'Alta', medium: 'Media', low: 'Baja' }
+  const TYPE_ES: Record<string, string> = { development: 'Desarrollo', administrative: 'Administrativo', dual: 'Dual' }
+
+  const headers = ['Proyecto', 'Área', 'Prioridad', 'Tipo', 'Bloqueado', 'Fase Dev', 'Fase Admin', 'SLA Vencimiento', 'Fecha creación']
+  const rows = projects.map(p => {
+    const flows: any[] = (p as any).project_flows ?? []
+    const devFlow  = flows.find((f: any) => f.flow_type === 'development')
+    const admFlow  = flows.find((f: any) => f.flow_type === 'administrative')
+    return [
+      p.title,
+      (p as any).requests?.requester_area ?? '',
+      PRIORITY_ES[p.priority] ?? p.priority,
+      TYPE_ES[p.project_type] ?? p.project_type,
+      p.is_blocked ? 'Sí' : 'No',
+      devFlow?.current_phase ?? '',
+      admFlow?.current_phase ?? '',
+      (p as any).sla_target_date ?? '',
+      (p.created_at as string)?.slice(0, 10) ?? '',
+    ]
+  })
+
+  const csv = [headers, ...rows]
+    .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `proyectos-activos-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 async function exportCompletedCSV() {
   const { data: projects } = await supabase
     .from('projects')
@@ -172,6 +215,8 @@ function MonthlyChart({ data }: { data: DashboardStats['completedByMonth'] }) {
 
 // ── Main component ───────────────────────────────────────────────────────────
 
+const AREAS = ['AASS', 'ATC', 'DDC', 'QA', 'SAQ']
+
 const PERIOD_OPTIONS = [
   { value: 30,   label: 'Últimos 30d' },
   { value: 90,   label: 'Últimos 90d' },
@@ -180,13 +225,20 @@ const PERIOD_OPTIONS = [
 
 export default function DashboardView() {
   const [period, setPeriod] = useState<number | null>(null)
-  const [exporting, setExporting] = useState(false)
-  const { stats, loading, reload } = useDashboardData(period)
+  const [areaFilter, setAreaFilter] = useState<string | null>(null)
+  const [exporting, setExporting] = useState<'completed' | 'active' | null>(null)
+  const { stats, loading, reload } = useDashboardData(period, areaFilter)
 
-  const handleExport = async () => {
-    setExporting(true)
+  const handleExportCompleted = async () => {
+    setExporting('completed')
     try { await exportCompletedCSV() }
-    finally { setExporting(false) }
+    finally { setExporting(null) }
+  }
+
+  const handleExportActive = async () => {
+    setExporting('active')
+    try { await exportActiveCSV() }
+    finally { setExporting(null) }
   }
 
   if (loading) {
@@ -250,12 +302,34 @@ export default function DashboardView() {
               </button>
             ))}
           </div>
-          <button
-            onClick={handleExport}
-            disabled={exporting}
-            className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition shadow-sm disabled:opacity-50 flex items-center gap-2"
+
+          {/* Filtro de área */}
+          <select
+            value={areaFilter ?? ''}
+            onChange={e => setAreaFilter(e.target.value || null)}
+            className={`px-3 py-2 border rounded-lg text-sm outline-none transition cursor-pointer ${
+              areaFilter ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600'
+            }`}
           >
-            {exporting ? '⏳ Exportando...' : '⬇ Exportar CSV'}
+            <option value="">Todas las áreas</option>
+            {AREAS.map(area => (
+              <option key={area} value={area}>{area}</option>
+            ))}
+          </select>
+
+          <button
+            onClick={handleExportActive}
+            disabled={exporting !== null}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition shadow-sm disabled:opacity-50"
+          >
+            {exporting === 'active' ? '⏳ Exportando...' : '⬇ Activos CSV'}
+          </button>
+          <button
+            onClick={handleExportCompleted}
+            disabled={exporting !== null}
+            className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition shadow-sm disabled:opacity-50"
+          >
+            {exporting === 'completed' ? '⏳ Exportando...' : '⬇ Completados CSV'}
           </button>
           <button
             onClick={reload}
