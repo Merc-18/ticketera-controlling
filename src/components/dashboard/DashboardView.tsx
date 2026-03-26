@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useDashboardData, type DashboardStats } from '../../hooks/useDashboardData'
+import { toast } from '../../lib/toast'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -11,7 +12,7 @@ async function exportActiveCSV() {
     .eq('status', 'active')
     .order('created_at', { ascending: false })
 
-  if (!projects?.length) { alert('No hay proyectos activos para exportar.'); return }
+  if (!projects?.length) { toast.info('No hay proyectos activos para exportar.'); return }
 
   const PRIORITY_ES: Record<string, string> = { urgent: 'Urgente', high: 'Alta', medium: 'Media', low: 'Baja' }
   const TYPE_ES: Record<string, string> = { development: 'Desarrollo', administrative: 'Administrativo', dual: 'Dual' }
@@ -54,7 +55,7 @@ async function exportCompletedCSV() {
     .eq('status', 'completed')
     .order('updated_at', { ascending: false })
 
-  if (!projects?.length) { alert('No hay proyectos completados para exportar.'); return }
+  if (!projects?.length) { toast.info('No hay proyectos completados para exportar.'); return }
 
   const ids = projects.map(p => p.id)
   const { data: slaLogs } = await supabase

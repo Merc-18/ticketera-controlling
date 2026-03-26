@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { Comment } from '../../types/database.types'
+import { logActivity } from '../../hooks/useActivityLog'
+import { useUsers } from '../../hooks/useUsers'
+import { sendNotification } from '../../lib/notifications'
 
 interface Props {
   projectId: string
@@ -10,12 +13,24 @@ interface CommentWithUser extends Comment {
   user?: { full_name: string; role: string } | null
 }
 
+function renderContent(text: string) {
+  const parts = text.split(/(@\w+)/g)
+  return parts.map((part, i) =>
+    /^@\w+$/.test(part)
+      ? <span key={i} className="text-blue-600 font-semibold">{part}</span>
+      : <span key={i}>{part}</span>
+  )
+}
+
 export default function CommentsSection({ projectId }: Props) {
+  const { activeUsers } = useUsers()
   const [comments, setComments] = useState<CommentWithUser[]>([])
   const [newComment, setNewComment] = useState('')
-  const [authorName, setAuthorName] = useState(() => localStorage.getItem('comment_author') ?? '')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState('')
+  const [showMentions, setShowMentions] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => { loadComments() }, [projectId])
 
@@ -37,21 +52,74 @@ export default function CommentsSection({ projectId }: Props) {
     }
   }
 
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value
+    const cursor = e.target.selectionStart ?? val.length
+    const textBefore = val.slice(0, cursor)
+    const match = textBefore.match(/@(\w*)$/)
+    if (match) {
+      setMentionQuery(match[1].toLowerCase())
+      setShowMentions(true)
+    } else {
+      setShowMentions(false)
+      setMentionQuery('')
+    }
+    setNewComment(val)
+  }
+
+  const handleMentionSelect = (fullName: string) => {
+    const firstName = fullName.split(' ')[0]
+    const cursor = textareaRef.current?.selectionStart ?? newComment.length
+    const before = newComment.slice(0, cursor).replace(/@(\w*)$/, `@${firstName} `)
+    const after  = newComment.slice(cursor)
+    setNewComment(before + after)
+    setShowMentions(false)
+    setMentionQuery('')
+    textareaRef.current?.focus()
+  }
+
+  const mentionedUsers = showMentions
+    ? activeUsers.filter(u =>
+        u.full_name.split(' ')[0].toLowerCase().startsWith(mentionQuery)
+      )
+    : []
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newComment.trim()) return
 
-    const name = authorName.trim()
-    if (name) localStorage.setItem('comment_author', name)
-
     setSubmitting(true)
     try {
-      const { error } = await supabase
+      const { data: comment, error } = await supabase
         .from('comments')
         .insert([{ project_id: projectId, content: newComment.trim() }])
+        .select()
+        .single()
 
       if (error) throw error
+
+      await logActivity(projectId, 'comment_added', {
+        comment_id: comment.id,
+        preview: newComment.trim().slice(0, 80),
+      })
+
+      // Notificar a usuarios mencionados
+      const mentions = [...newComment.matchAll(/@(\w+)/g)].map(m => m[1].toLowerCase())
+      const toNotify = activeUsers.filter(u =>
+        mentions.includes(u.full_name.split(' ')[0].toLowerCase())
+      )
+      for (const user of toNotify) {
+        await sendNotification({
+          userId:    user.id,
+          type:      'mention',
+          title:     'Te mencionaron en un comentario',
+          message:   newComment.trim().slice(0, 80),
+          projectId,
+        })
+      }
+
       setNewComment('')
+      setShowMentions(false)
       await loadComments()
     } catch (err) {
       console.error('Error creating comment:', err)
@@ -73,21 +141,38 @@ export default function CommentsSection({ projectId }: Props) {
     <div className="space-y-4">
       {/* Form */}
       <form onSubmit={handleSubmit} className="bg-gray-50 rounded-lg p-4 border space-y-2">
-        <input
-          type="text"
-          value={authorName}
-          onChange={e => setAuthorName(e.target.value)}
-          placeholder="Tu nombre (opcional)"
-          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-        />
-        <textarea
-          value={newComment}
-          onChange={e => setNewComment(e.target.value)}
-          placeholder="Escribe un comentario..."
-          rows={3}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none"
-        />
-        <div className="flex justify-end">
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            value={newComment}
+            onChange={handleTextChange}
+            onKeyDown={e => { if (e.key === 'Escape') setShowMentions(false) }}
+            placeholder="Escribe un comentario... usa @nombre para mencionar a alguien"
+            rows={3}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none"
+          />
+          {/* Mention dropdown */}
+          {showMentions && mentionedUsers.length > 0 && (
+            <div className="absolute left-0 bottom-full mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[180px] py-1 max-h-40 overflow-y-auto">
+              <p className="px-3 py-1 text-[10px] text-gray-400 font-semibold uppercase tracking-wide border-b border-gray-100">
+                Mencionar
+              </p>
+              {mentionedUsers.map(u => (
+                <button
+                  key={u.id}
+                  type="button"
+                  onMouseDown={e => { e.preventDefault(); handleMentionSelect(u.full_name) }}
+                  className="w-full text-left px-3 py-1.5 text-sm text-gray-800 hover:bg-blue-50 transition"
+                >
+                  @{u.full_name.split(' ')[0]}
+                  <span className="text-xs text-gray-400 ml-1">{u.full_name.split(' ').slice(1).join(' ')}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-400">Usa @ para mencionar a un colega</p>
           <button
             type="submit"
             disabled={!newComment.trim() || submitting}
@@ -126,7 +211,9 @@ export default function CommentsSection({ projectId }: Props) {
                         })}
                       </span>
                     </div>
-                    <p className="text-gray-700 text-sm whitespace-pre-wrap">{comment.content}</p>
+                    <p className="text-gray-700 text-sm whitespace-pre-wrap leading-relaxed">
+                      {renderContent(comment.content)}
+                    </p>
                   </div>
                 </div>
               </div>

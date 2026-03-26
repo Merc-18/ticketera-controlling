@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
 import { useChecklist } from '../../hooks/useChecklist'
 import type { ProjectFlow } from '../../types/database.types'
 
@@ -25,7 +26,14 @@ interface Props {
 }
 
 export default function ChecklistSection({ flow, onProgressUpdate }: Props) {
-  const { items, loading, toggleItem, addItem, deleteItem } = useChecklist(flow.id)
+  const { items, loading, toggleItem, addItem, deleteItem, reorderItems } = useChecklist(flow.id)
+
+  const handleDragEnd = (result: DropResult) => {
+    const { source, destination } = result
+    if (!destination || source.droppableId !== destination.droppableId) return
+    if (source.index === destination.index) return
+    reorderItems(source.droppableId, source.index, destination.index)
+  }
   const [newItemText, setNewItemText] = useState<Record<string, string>>({})
   const [expandedPhase, setExpandedPhase] = useState<string | null>(flow.current_phase)
   const [saving, setSaving] = useState<string | null>(null)
@@ -59,6 +67,7 @@ export default function ChecklistSection({ flow, onProgressUpdate }: Props) {
   const completedItems = items.filter(i => i.completed).length
 
   return (
+    <DragDropContext onDragEnd={handleDragEnd}>
     <div className="space-y-1.5 mt-3">
       {/* Resumen global */}
       {totalItems > 0 && (
@@ -122,34 +131,55 @@ export default function ChecklistSection({ flow, onProgressUpdate }: Props) {
                   </p>
                 )}
 
-                {phaseItems.map(item => (
-                  <div
-                    key={item.id}
-                    className={`flex items-start gap-2.5 group py-0.5 ${saving === item.id ? 'opacity-50' : ''}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={item.completed}
-                      disabled={saving === item.id}
-                      onChange={() => handleToggle(item.id, !item.completed)}
-                      className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300 rounded cursor-pointer flex-shrink-0"
-                    />
-                    <span
-                      className={`text-sm leading-snug flex-1 ${
-                        item.completed ? 'line-through text-gray-400' : 'text-gray-700'
-                      }`}
-                    >
-                      {item.description}
-                    </span>
-                    <button
-                      onClick={() => deleteItem(item.id)}
-                      className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition text-xs ml-1 flex-shrink-0"
-                      title="Eliminar item"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                <Droppable droppableId={phase}>
+                  {(provided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-1">
+                      {phaseItems.map((item, index) => (
+                        <Draggable key={item.id} draggableId={item.id} index={index}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className={`flex items-start gap-2.5 group py-0.5 rounded ${
+                                snapshot.isDragging ? 'bg-blue-50 shadow-sm' : ''
+                              } ${saving === item.id ? 'opacity-50' : ''}`}
+                            >
+                              <span
+                                {...provided.dragHandleProps}
+                                className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing mt-0.5 shrink-0 text-xs select-none"
+                                title="Arrastrar para reordenar"
+                              >
+                                ⠿
+                              </span>
+                              <input
+                                type="checkbox"
+                                checked={item.completed}
+                                disabled={saving === item.id}
+                                onChange={() => handleToggle(item.id, !item.completed)}
+                                className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300 rounded cursor-pointer flex-shrink-0"
+                              />
+                              <span
+                                className={`text-sm leading-snug flex-1 ${
+                                  item.completed ? 'line-through text-gray-400' : 'text-gray-700'
+                                }`}
+                              >
+                                {item.description}
+                              </span>
+                              <button
+                                onClick={() => deleteItem(item.id)}
+                                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition text-xs ml-1 flex-shrink-0"
+                                title="Eliminar item"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
 
                 {/* Agregar nuevo item */}
                 <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
@@ -175,5 +205,6 @@ export default function ChecklistSection({ flow, onProgressUpdate }: Props) {
         )
       })}
     </div>
+    </DragDropContext>
   )
 }

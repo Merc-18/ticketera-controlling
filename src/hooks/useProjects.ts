@@ -17,7 +17,14 @@ export function useProjects() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active')
+  const [statusFilter, _setStatusFilter] = useState<StatusFilter>(() => {
+    const s = localStorage.getItem('kanban_statusFilter') as StatusFilter
+    return (['active', 'completed', 'archived'] as StatusFilter[]).includes(s) ? s : 'active'
+  })
+  const setStatusFilter = (v: StatusFilter) => {
+    localStorage.setItem('kanban_statusFilter', v)
+    _setStatusFilter(v)
+  }
   const [limit, setLimit] = useState(100)
   const [hasMore, setHasMore] = useState(false)
 
@@ -52,7 +59,7 @@ export function useProjects() {
         .from('projects')
         .select(`
           *,
-          project_flows (*),
+          project_flows (*, checklist_items(id, completed)),
           requests (requester_area, requester_name, request_type, request_number)
         `)
         .eq('status', status)
@@ -101,7 +108,27 @@ export function useProjects() {
           if (slaLog) {
             const now = Date.now()
             const approvalDate = new Date(slaLog.created_at).getTime()
-            const daysElapsed = Math.ceil((now - approvalDate) / (1000 * 60 * 60 * 24))
+
+            // Restar tiempo que estuvo bloqueado (no cuenta contra el SLA)
+            const { data: blockEvents } = await supabase
+              .from('activity_logs')
+              .select('action, created_at')
+              .eq('project_id', projectId)
+              .in('action', ['blocked', 'unblocked'])
+              .order('created_at', { ascending: true })
+
+            let blockedMs = 0
+            let blockStart: number | null = null
+            for (const ev of blockEvents ?? []) {
+              if (ev.action === 'blocked') {
+                blockStart = new Date(ev.created_at).getTime()
+              } else if (ev.action === 'unblocked' && blockStart !== null) {
+                blockedMs += new Date(ev.created_at).getTime() - blockStart
+                blockStart = null
+              }
+            }
+            const blockedDays = Math.floor(blockedMs / 86400000)
+            const daysElapsed = Math.max(0, Math.ceil((now - approvalDate) / (1000 * 60 * 60 * 24)) - blockedDays)
             const dueDate = (slaLog.details as any)?.sla_target_date
             const onTime = dueDate ? new Date() <= new Date(dueDate + 'T23:59:59') : undefined
 
@@ -125,6 +152,7 @@ export function useProjects() {
               cycle_time_days: daysElapsed,
               due_date: dueDate,
               on_time: onTime,
+              ...(blockedDays > 0 && { blocked_days: blockedDays }),
               ...(leadTimeDays !== undefined && { lead_time_days: leadTimeDays }),
               ...(approvalWaitDays !== undefined && { approval_wait_days: approvalWaitDays }),
             })

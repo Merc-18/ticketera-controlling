@@ -38,6 +38,30 @@ function monthsBetween(start: Date, end: Date): number {
 
 const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
+function exportGanttCSV(items: Array<{ project: ProjectWithRelations; flow: ProjectFlow }>) {
+  const PRIORITY_ES: Record<string, string> = { urgent: 'Urgente', high: 'Alta', medium: 'Media', low: 'Baja' }
+  const headers = ['Título', 'Prioridad', 'Área', 'Inicio', 'Vencimiento', 'Progreso', 'Fase']
+  const rows = items.map(({ project, flow }) => [
+    project.title,
+    PRIORITY_ES[project.priority] ?? project.priority,
+    project.requests?.requester_area ?? '',
+    project.start_date ?? project.created_at?.slice(0, 10) ?? '',
+    project.due_date ?? '',
+    `${flow.progress}%`,
+    flow.current_phase,
+  ])
+  const csv = [headers, ...rows]
+    .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href = url
+  a.download = `proyectos-gantt-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function GanttView({ projects, boardType, onProjectClick }: Props) {
   const today = new Date()
 
@@ -184,8 +208,14 @@ export default function GanttView({ projects, boardType, onProjectClick }: Props
         </div>
       </div>
 
-      <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-500">
-        {items.length} proyecto{items.length !== 1 ? 's' : ''} · Arrastra horizontalmente para ver el timeline completo
+      <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-500 flex items-center justify-between">
+        <span>{items.length} proyecto{items.length !== 1 ? 's' : ''} · Arrastra horizontalmente para ver el timeline completo</span>
+        <button
+          onClick={() => exportGanttCSV(items)}
+          className="px-3 py-1 bg-white border border-gray-200 text-gray-600 rounded text-xs hover:bg-gray-100 transition"
+        >
+          ⬇ Exportar CSV
+        </button>
       </div>
     </div>
   )

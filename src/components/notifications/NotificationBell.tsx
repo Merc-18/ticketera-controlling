@@ -5,6 +5,7 @@ const TYPE_ICON: Record<string, string> = {
   project_assigned: '👤',
   project_blocked:  '🚫',
   sla_warning:      '⚠️',
+  mention:          '💬',
 }
 
 function timeAgo(dateStr: string): string {
@@ -17,7 +18,11 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(hrs / 24)}d`
 }
 
-export default function NotificationBell() {
+interface Props {
+  onProjectClick?: (projectId: string) => void
+}
+
+export default function NotificationBell({ onProjectClick }: Props) {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -85,8 +90,12 @@ export default function NotificationBell() {
               notifications.map(n => (
                 <button
                   key={n.id}
-                  onClick={() => { if (!n.read) markAsRead(n.id); setOpen(false) }}
-                  className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition flex items-start gap-3 ${!n.read ? 'bg-blue-50/50' : ''}`}
+                  onClick={() => {
+                    if (!n.read) markAsRead(n.id)
+                    setOpen(false)
+                    if (n.project_id && onProjectClick) onProjectClick(n.project_id)
+                  }}
+                  className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition flex items-start gap-3 ${!n.read ? 'bg-blue-50/50' : ''} ${n.project_id ? 'cursor-pointer' : ''}`}
                 >
                   <span className="text-lg shrink-0 mt-0.5">{TYPE_ICON[n.type] ?? '📝'}</span>
                   <div className="flex-1 min-w-0">

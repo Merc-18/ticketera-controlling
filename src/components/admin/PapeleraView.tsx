@@ -23,7 +23,8 @@ const TYPE_LABEL: Record<string, string> = {
 export default function PapeleraView() {
   const [projects, setProjects] = useState<DeletedProject[]>([])
   const [loading, setLoading] = useState(true)
-  const [restoring, setRestoring] = useState<string | null>(null)
+  const [confirmRestore, setConfirmRestore] = useState<string | null>(null)
+  const [restoring, setRestoring] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -41,16 +42,17 @@ export default function PapeleraView() {
   useEffect(() => { load() }, [])
 
   const restore = async (id: string) => {
-    setRestoring(id)
+    setRestoring(true)
     try {
       await supabase
         .from('projects')
         .update({ status: 'active', updated_at: new Date().toISOString() })
         .eq('id', id)
       await logActivity(id, 'project_restored', {})
+      setConfirmRestore(null)
       await load()
     } finally {
-      setRestoring(null)
+      setRestoring(false)
     }
   }
 
@@ -122,11 +124,10 @@ export default function PapeleraView() {
 
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button
-                    onClick={() => restore(p.id)}
-                    disabled={restoring === p.id}
-                    className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-100 transition disabled:opacity-50"
+                    onClick={() => setConfirmRestore(p.id)}
+                    className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-100 transition"
                   >
-                    {restoring === p.id ? 'Restaurando...' : '↩ Restaurar'}
+                    ↩ Restaurar
                   </button>
                   <button
                     onClick={() => setConfirmDelete(p.id)}
@@ -138,6 +139,34 @@ export default function PapeleraView() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Confirm restore */}
+      {confirmRestore && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-sm w-full p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">↩ Restaurar proyecto</h3>
+            <p className="text-sm text-gray-600 mb-6">
+              El proyecto volverá a estar <span className="font-semibold text-green-600">activo</span> y visible en los boards.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmRestore(null)}
+                disabled={restoring}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => restore(confirmRestore)}
+                disabled={restoring}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition text-sm disabled:opacity-50"
+              >
+                {restoring ? 'Restaurando...' : 'Sí, restaurar'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useRequests } from '../../hooks/useRequests'
 import { useUsers } from '../../hooks/useUsers'
 import type { Request } from '../../types/database.types'
+import { calcSlaFormalDays, calcTargetDate } from '../../lib/sla-config'
+import { toast } from '../../lib/toast'
 
 const isUrgent = (r: Request) => !!r.observations?.startsWith('🔴 URGENTE')
 
@@ -84,8 +86,9 @@ export default function RequestInbox() {
       setShowApproveModal(false)
       setSelectedRequest(null)
       setSameUser(false)
+      toast.success('Solicitud aprobada y proyecto creado')
     } catch (err) {
-      alert('Error al aprobar la solicitud')
+      toast.error('Error al aprobar la solicitud')
     } finally {
       setActionLoading(false)
     }
@@ -99,8 +102,9 @@ export default function RequestInbox() {
       setShowRejectModal(false)
       setRejectionReason('')
       setSelectedRequest(null)
+      toast.success('Solicitud rechazada')
     } catch (err) {
-      alert('Error al rechazar la solicitud')
+      toast.error('Error al rechazar la solicitud')
     } finally {
       setActionLoading(false)
     }
@@ -220,10 +224,11 @@ export default function RequestInbox() {
           ) : (
             approvedRequests.map(request => {
               const urgent = isUrgent(request)
+              const projectDeleted = (request as any).projects?.status === 'deleted'
               return (
                 <div
                   key={request.id}
-                  className="bg-white border border-green-100 rounded-lg p-4 hover:shadow-md transition cursor-pointer"
+                  className={`bg-white border rounded-lg p-4 hover:shadow-md transition cursor-pointer ${projectDeleted ? 'border-gray-200 opacity-75' : 'border-green-100'}`}
                   onClick={() => setSelectedRequest(request)}
                 >
                   <div className="flex items-start justify-between mb-3">
@@ -233,6 +238,11 @@ export default function RequestInbox() {
                         {urgent && (
                           <span className="px-2 py-0.5 bg-red-100 text-red-700 border border-red-200 rounded-full text-xs font-bold">
                             🔴 URGENTE
+                          </span>
+                        )}
+                        {projectDeleted && (
+                          <span className="px-2 py-0.5 bg-gray-100 text-gray-500 border border-gray-200 rounded-full text-xs font-medium">
+                            🗑 Proyecto eliminado
                           </span>
                         )}
                       </div>
@@ -621,6 +631,32 @@ export default function RequestInbox() {
                 </div>
               )}
             </div>
+
+            {/* SLA Preview */}
+            {(() => {
+              const slaFormalDays = calcSlaFormalDays(selectedRequest.request_type, selectedRequest.needs_code)
+              const slaFormalDate = calcTargetDate(slaFormalDays, 'medium') // medium = × 1.00 = SLA formal
+              const targetDate    = calcTargetDate(slaFormalDays, approveData.priority)
+              const fmt = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+              return approveData.priority === 'low' ? (
+                <div className="mb-4 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm">
+                  <p className="font-medium text-gray-600 mb-0.5">SLA</p>
+                  <p className="text-gray-500 text-xs">Prioridad baja — sin SLA asignado (backlog)</p>
+                </div>
+              ) : (
+                <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm space-y-1">
+                  <p className="font-medium text-blue-800 mb-1">SLA calculado</p>
+                  <div className="flex justify-between text-xs text-blue-700">
+                    <span>SLA formal ({slaFormalDays}d hábiles)</span>
+                    <span className="font-medium">{slaFormalDate ? fmt(slaFormalDate) : '—'}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-blue-600 border-t border-blue-100 pt-1 mt-1">
+                    <span>Target interno ({approveData.priority})</span>
+                    <span className="font-bold text-blue-900">{targetDate ? fmt(targetDate) : '—'}</span>
+                  </div>
+                </div>
+              )
+            })()}
 
             <div className="flex gap-3">
               <button

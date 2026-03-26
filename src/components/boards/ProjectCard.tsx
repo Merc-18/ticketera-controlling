@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import type { Project, ProjectFlow, User, Tag } from '../../types/database.types'
+import type { Project, ProjectFlow, User } from '../../types/database.types'
 
 interface ProjectWithArea extends Project {
   requests?: { requester_area: string; request_number?: string } | null
@@ -10,7 +10,6 @@ interface Props {
   flow: ProjectFlow
   onClick: () => void
   users?: User[]
-  tags?: Tag[]
   onAssign?: (flowId: string, userId: string) => void
 }
 
@@ -52,11 +51,27 @@ function getDueDateBadge(dueDate?: string | null) {
   return { label: new Date(dueDate + 'T00:00:00').toLocaleDateString('es-PE', { day: '2-digit', month: 'short' }), cls: 'bg-gray-100 text-gray-500 border border-gray-200' }
 }
 
-export default function ProjectCard({ project, flow, onClick, users = [], tags = [], onAssign }: Props) {
+function getSlaTargetBadge(slaTargetDate?: string | null) {
+  if (!slaTargetDate) return null
+  const today = new Date().toISOString().slice(0, 10)
+  const diff = Math.ceil((new Date(slaTargetDate).getTime() - new Date(today).getTime()) / 86400000)
+  if (diff < 0)  return { label: `🎯 Target vencido (${Math.abs(diff)}d)`, cls: 'bg-red-100 text-red-700 border border-red-300' }
+  if (diff === 0) return { label: '🎯 Target hoy',                          cls: 'bg-red-50 text-red-600 border border-red-200' }
+  if (diff <= 2)  return { label: `🎯 ${diff}d`,                            cls: 'bg-orange-100 text-orange-700 border border-orange-300' }
+  if (diff <= 5)  return { label: `🎯 ${diff}d`,                            cls: 'bg-yellow-100 text-yellow-700 border border-yellow-200' }
+  return { label: `🎯 ${new Date(slaTargetDate + 'T00:00:00').toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })}`, cls: 'bg-green-50 text-green-700 border border-green-200' }
+}
+
+export default function ProjectCard({ project, flow, onClick, users = [], onAssign }: Props) {
   const area = project.requests?.requester_area
-  const requestNumber = project.requests?.request_number
+  const requestNumber = project.requests?.request_number ?? project.project_number
   const areaColorClass = area ? (AREA_COLORS[area] ?? 'bg-gray-100 text-gray-600') : ''
   const dueBadge = getDueDateBadge(project.due_date)
+  const slaTargetBadge = getSlaTargetBadge(project.sla_target_date)
+
+  const checklistItems: Array<{ id: string; completed: boolean }> = (flow as any).checklist_items ?? []
+  const checkTotal = checklistItems.length
+  const checkDone  = checklistItems.filter(i => i.completed).length
   const [showAssign, setShowAssign] = useState(false)
   const assignRef = useRef<HTMLDivElement>(null)
 
@@ -113,7 +128,12 @@ export default function ProjectCard({ project, flow, onClick, users = [], tags =
             DUAL
           </span>
         )}
-        {dueBadge && (
+        {slaTargetBadge && (
+          <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${slaTargetBadge.cls}`}>
+            {slaTargetBadge.label}
+          </span>
+        )}
+        {!slaTargetBadge && dueBadge && (
           <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${dueBadge.cls}`}>
             {dueBadge.label}
           </span>
@@ -122,12 +142,16 @@ export default function ProjectCard({ project, flow, onClick, users = [], tags =
 
       {/* Footer */}
       <div className="flex items-center justify-between text-xs text-gray-400">
-        <span>
+        <span className="flex items-center gap-2">
           {requestNumber
-            ? <span className="font-mono text-gray-500 mr-1.5">{requestNumber}</span>
-            : <span className="mr-1.5 px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 text-[10px] font-medium">Interno</span>
+            ? <span className="font-mono text-gray-500">{requestNumber}</span>
+            : <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 text-[10px] font-medium">Interno</span>
           }
-          {new Date(project.updated_at).toLocaleDateString('es-PE')}
+          {checkTotal > 0 && (
+            <span className={`flex items-center gap-0.5 text-[10px] font-medium ${checkDone === checkTotal ? 'text-green-600' : 'text-gray-400'}`}>
+              ✓ {checkDone}/{checkTotal}
+            </span>
+          )}
         </span>
 
         <div className="flex items-center gap-1.5">

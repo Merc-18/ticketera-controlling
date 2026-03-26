@@ -18,6 +18,8 @@ type ViewMode  = 'kanban' | 'table' | 'gantt' | 'roadmap'
 
 interface Props {
   boardType: BoardType
+  openProjectId?: string | null
+  onOpenHandled?: () => void
 }
 
 const PHASES = {
@@ -63,17 +65,25 @@ const VIEW_MODES: { value: ViewMode; label: string; icon: string }[] = [
   { value: 'roadmap', label: 'Roadmap', icon: '🗓' },
 ]
 
-export default function KanbanBoard({ boardType }: Props) {
+export default function KanbanBoard({ boardType, openProjectId, onOpenHandled }: Props) {
   const { projects, loading, hasMore, loadMore, statusFilter, setStatusFilter, updateProjectFlow, updateProject, updateFlowDetails, createProject, deleteProject, reload } = useProjects()
   const { activeUsers } = useUsers()
   const { user: currentUser } = useAuth()
   const [selectedProject, setSelectedProject] = useState<{ project: any; flow: ProjectFlow } | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
-  const [priorityFilter, setPriorityFilter] = useState('all')
-  const [areaFilter, setAreaFilter] = useState('all')
-  const [myProjectsOnly, setMyProjectsOnly] = useState(false)
+  const [priorityFilter, setPriorityFilter] = useState(() => localStorage.getItem('kanban_priorityFilter') || 'all')
+  const [areaFilter, setAreaFilter]         = useState(() => localStorage.getItem('kanban_areaFilter') || 'all')
+  const [myProjectsOnly, setMyProjectsOnly] = useState(() => localStorage.getItem('kanban_myProjectsOnly') === 'true')
   const [searchQuery, setSearchQuery] = useState('')
-  const [viewMode, setViewMode] = useState<ViewMode>('kanban')
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const v = localStorage.getItem('kanban_viewMode') as ViewMode
+    return (['kanban', 'table', 'gantt', 'roadmap'] as ViewMode[]).includes(v) ? v : 'kanban'
+  })
+
+  useEffect(() => { localStorage.setItem('kanban_priorityFilter', priorityFilter) }, [priorityFilter])
+  useEffect(() => { localStorage.setItem('kanban_areaFilter', areaFilter) },         [areaFilter])
+  useEffect(() => { localStorage.setItem('kanban_myProjectsOnly', String(myProjectsOnly)) }, [myProjectsOnly])
+  useEffect(() => { localStorage.setItem('kanban_viewMode', viewMode) },              [viewMode])
 
   // Sincronizar selectedProject con datos frescos después de cada reload
   useEffect(() => {
@@ -84,6 +94,17 @@ export default function KanbanBoard({ boardType }: Props) {
       }
     }
   }, [projects])
+
+  // Abrir proyecto al hacer clic en una notificación
+  useEffect(() => {
+    if (!openProjectId || !projects.length) return
+    const project = projects.find(p => p.id === openProjectId)
+    if (project) {
+      const flow = (project as any).project_flows?.[0] ?? null
+      setSelectedProject({ project, flow })
+      onOpenHandled?.()
+    }
+  }, [openProjectId, projects])
 
   const phases = PHASES[boardType]
 
@@ -296,8 +317,22 @@ export default function KanbanBoard({ boardType }: Props) {
         />
       )}
 
+      {/* ── KANBAN: sin resultados con filtros activos ── */}
+      {viewMode === 'kanban' && statusFilter === 'active' && filteredProjects.length === 0 && hasFilters && (
+        <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+          <span className="text-5xl mb-3">🔍</span>
+          <p className="text-base font-medium text-gray-500">Sin proyectos con los filtros aplicados</p>
+          <button
+            onClick={() => { setPriorityFilter('all'); setAreaFilter('all'); setMyProjectsOnly(false); setSearchQuery('') }}
+            className="mt-3 text-sm text-primary hover:underline"
+          >
+            Limpiar filtros
+          </button>
+        </div>
+      )}
+
       {/* ── VISTA KANBAN ── */}
-      {viewMode === 'kanban' && statusFilter === 'active' && (
+      {viewMode === 'kanban' && statusFilter === 'active' && !(filteredProjects.length === 0 && hasFilters) && (
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="flex gap-4 overflow-x-auto pb-4">
             {phases.map((phase) => (

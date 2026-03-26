@@ -110,5 +110,19 @@ export function useChecklist(flowId: string) {
     }
   }
 
-  return { items, loading, toggleItem, addItem, deleteItem, reload: loadItems }
+  const reorderItems = async (phase: string, fromIdx: number, toIdx: number) => {
+    const others    = items.filter(i => i.phase !== phase)
+    const phaseList = [...items.filter(i => i.phase === phase)]
+    const [moved]   = phaseList.splice(fromIdx, 1)
+    phaseList.splice(toIdx, 0, moved)
+    const reordered = phaseList.map((item, idx) => ({ ...item, order_index: idx }))
+    setItems([...others, ...reordered])
+    await Promise.all(
+      reordered.map(item =>
+        supabase.from('checklist_items').update({ order_index: item.order_index }).eq('id', item.id)
+      )
+    )
+  }
+
+  return { items, loading, toggleItem, addItem, deleteItem, reorderItems, reload: loadItems }
 }

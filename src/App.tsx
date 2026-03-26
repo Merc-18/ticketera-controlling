@@ -16,6 +16,7 @@ import WorkloadView from './components/admin/WorkloadView'
 import PapeleraView from './components/admin/PapeleraView'
 import NotificationBell from './components/notifications/NotificationBell'
 import { usePendingCount } from './hooks/usePendingCount'
+import { useSlaWarnings } from './hooks/useSlaWarnings'
 
 function AdminClock() {
   const [time, setTime] = useState('')
@@ -40,7 +41,9 @@ function Dashboard() {
   const [currentBoard, setCurrentBoard] = useState<'development' | 'administrative'>('development')
   const [currentTab, setCurrentTab]   = useState<'dashboard' | 'boards' | 'requests' | 'equipo'>('dashboard')
   const [adminSubTab, setAdminSubTab] = useState<'usuarios' | 'carga' | 'papelera'>('carga')
+  const [openProjectId, setOpenProjectId] = useState<string | null>(null)
   const pendingCount = usePendingCount(user?.role === 'admin')
+  useSlaWarnings()
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -115,7 +118,10 @@ function Dashboard() {
               {/* Reloj + Campana */}
               <div className="flex items-center gap-2">
                 {user?.role === 'admin' && <AdminClock />}
-                <NotificationBell />
+                <NotificationBell onProjectClick={(projectId) => {
+                  setCurrentTab('boards')
+                  setOpenProjectId(projectId)
+                }} />
               </div>
 
               {/* User Info */}
@@ -141,7 +147,11 @@ function Dashboard() {
         {currentTab === 'dashboard' && <DashboardView />}
 
         {currentTab === 'boards' && (
-          <KanbanBoard boardType={currentBoard} />
+          <KanbanBoard
+            boardType={currentBoard}
+            openProjectId={openProjectId}
+            onOpenHandled={() => setOpenProjectId(null)}
+          />
         )}
 
         {currentTab === 'requests' && (
