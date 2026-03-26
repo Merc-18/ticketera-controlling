@@ -3,9 +3,10 @@ import { supabase } from '../lib/supabase'
 import type { ActivityLog } from '../types/database.types'
 
 export async function logActivity(projectId: string, action: string, details: Record<string, unknown> = {}) {
+  const { data: { user } } = await supabase.auth.getUser()
   const { error } = await supabase
     .from('activity_logs')
-    .insert([{ project_id: projectId, action, details }])
+    .insert([{ project_id: projectId, action, details, user_id: user?.id ?? null }])
   if (error) console.warn('[ActivityLog] Error al registrar actividad:', error.message)
 }
 

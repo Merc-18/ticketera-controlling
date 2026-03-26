@@ -2,23 +2,10 @@ import { useState } from 'react'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
 import { useChecklist } from '../../hooks/useChecklist'
 import type { ProjectFlow } from '../../types/database.types'
+import { PHASE_LABELS } from '../../lib/constants'
 
 const DEV_PHASES = ['backlog', 'design', 'dev', 'testing', 'deploy', 'done']
 const ADMIN_PHASES = ['backlog', 'ready_to_start', 'discovery', 'design', 'build', 'uat_validation', 'deployed']
-
-const PHASE_LABELS: Record<string, string> = {
-  backlog: 'Backlog',
-  design: 'Design',
-  dev: 'Development',
-  testing: 'Testing',
-  deploy: 'Deploy',
-  done: 'Done',
-  ready_to_start: 'Ready to Start',
-  discovery: 'Discovery',
-  build: 'Build',
-  uat_validation: 'UAT / Validation',
-  deployed: 'Deployed',
-}
 
 interface Props {
   flow: ProjectFlow

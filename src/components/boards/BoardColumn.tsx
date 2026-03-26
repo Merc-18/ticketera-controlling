@@ -1,6 +1,6 @@
 import { Droppable, Draggable } from '@hello-pangea/dnd'
 import ProjectCard from './ProjectCard'
-import type { Project, ProjectFlow, User, Tag } from '../../types/database.types'
+import type { Project, ProjectFlow, User } from '../../types/database.types'
 
 interface Props {
   phase: {
@@ -11,11 +11,12 @@ interface Props {
   projects: Array<{ project: Project; flow: ProjectFlow }>
   onProjectClick: (item: { project: Project; flow: ProjectFlow }) => void
   users?: User[]
-  tags?: Tag[]
   onAssign?: (flowId: string, userId: string) => void
+  selectedIds?: string[]
+  onSelect?: (projectId: string) => void
 }
 
-export default function BoardColumn({ phase, projects, onProjectClick, users = [], tags = [], onAssign }: Props) {
+export default function BoardColumn({ phase, projects, onProjectClick, users = [], onAssign, selectedIds, onSelect }: Props) {
   return (
     <div className="flex-shrink-0 w-80">
       {/* Column Header */}
@@ -58,8 +59,9 @@ export default function BoardColumn({ phase, projects, onProjectClick, users = [
                       flow={item.flow}
                       onClick={() => onProjectClick(item)}
                       users={users}
-                      tags={tags}
                       onAssign={onAssign}
+                      selected={selectedIds?.includes(item.project.id)}
+                      onSelect={onSelect}
                     />
                   </div>
                 )}

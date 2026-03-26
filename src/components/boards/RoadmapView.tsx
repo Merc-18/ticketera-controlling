@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { PRIORITY_COLORS, PRIORITY_DOT } from '../../lib/constants'
 
 interface Project {
   id: string
@@ -13,20 +14,10 @@ interface Project {
   requests?: { requester_area?: string } | null
 }
 
-const PRIORITY_COLOR: Record<string, string> = {
-  urgent: 'bg-red-100 border-red-400 text-red-800',
-  high:   'bg-orange-100 border-orange-400 text-orange-800',
-  medium: 'bg-yellow-100 border-yellow-400 text-yellow-800',
-  low:    'bg-green-100 border-green-400 text-green-800',
-}
-
-const PRIORITY_DOT: Record<string, string> = {
-  urgent: 'bg-red-500', high: 'bg-orange-500', medium: 'bg-yellow-400', low: 'bg-green-500',
-}
-
 interface Props {
   projects: Project[]
   onProjectClick: (p: { project: Project; flow: any }) => void
+  loading?: boolean
 }
 
 function getQuarters(year: number) {
@@ -38,9 +29,29 @@ function getQuarters(year: number) {
   ]
 }
 
-export default function RoadmapView({ projects, onProjectClick }: Props) {
+export default function RoadmapView({ projects, onProjectClick, loading }: Props) {
   const year = new Date().getFullYear()
   const [showYear, setShowYear] = useState(year)
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 animate-pulse">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-white rounded-xl border shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
+              <div className="h-4 w-16 bg-gray-200 rounded" />
+              <div className="h-5 w-6 bg-gray-200 rounded-full" />
+            </div>
+            <div className="p-2 space-y-1">
+              {[...Array(4)].map((_, j) => (
+                <div key={j} className="h-10 bg-gray-100 rounded-lg" />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
   const quarters = getQuarters(showYear)
   const today = new Date().toISOString().slice(0, 10)
 
@@ -147,7 +158,7 @@ export default function RoadmapView({ projects, onProjectClick }: Props) {
                                 )}
                               </div>
                             </div>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded border shrink-0 ${PRIORITY_COLOR[p.priority] ?? 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded border shrink-0 ${PRIORITY_COLORS[p.priority] ?? 'bg-gray-100 text-gray-500 border-gray-200'}`}>
                               {p.priority === 'urgent' ? 'Urg' : p.priority === 'high' ? 'Alta' : p.priority === 'medium' ? 'Med' : 'Baja'}
                             </span>
                           </div>

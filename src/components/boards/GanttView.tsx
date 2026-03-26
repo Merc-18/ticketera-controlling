@@ -1,4 +1,5 @@
 import type { Project, ProjectFlow } from '../../types/database.types'
+import { PRIORITY_BAR } from '../../lib/constants'
 
 interface ProjectWithRelations extends Project {
   project_flows?: ProjectFlow[]
@@ -9,13 +10,7 @@ interface Props {
   projects: ProjectWithRelations[]
   boardType: 'development' | 'administrative'
   onProjectClick: (item: { project: ProjectWithRelations; flow: ProjectFlow }) => void
-}
-
-const PRIORITY_BAR: Record<string, string> = {
-  urgent: 'bg-red-500',
-  high:   'bg-orange-400',
-  medium: 'bg-blue-500',
-  low:    'bg-green-500',
+  loading?: boolean
 }
 
 const PRIORITY_LABEL: Record<string, string> = {
@@ -62,8 +57,33 @@ function exportGanttCSV(items: Array<{ project: ProjectWithRelations; flow: Proj
   URL.revokeObjectURL(url)
 }
 
-export default function GanttView({ projects, boardType, onProjectClick }: Props) {
+export default function GanttView({ projects, boardType, onProjectClick, loading }: Props) {
   const today = new Date()
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border shadow-sm overflow-hidden animate-pulse">
+        <div className="bg-gray-50 border-b h-9" />
+        <div className="border-b flex h-9 items-center px-4 gap-6">
+          <div className="w-48 h-3 bg-gray-200 rounded shrink-0" />
+          <div className="flex flex-1 gap-3">
+            {[...Array(6)].map((_, i) => <div key={i} className="flex-1 h-3 bg-gray-100 rounded" />)}
+          </div>
+        </div>
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="flex items-center border-b px-4 gap-6" style={{ height: 44 }}>
+            <div className="w-48 h-3 bg-gray-200 rounded shrink-0" />
+            <div className="flex-1 relative h-6">
+              <div
+                className="absolute h-6 bg-gray-200 rounded-md"
+                style={{ left: `${8 + i * 9}%`, width: `${18 + (i % 3) * 10}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   const items = projects
     .map(project => {

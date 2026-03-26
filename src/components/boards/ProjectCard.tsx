@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import type { Project, ProjectFlow, User } from '../../types/database.types'
+import { getAvatarColor, getInitials, PRIORITY_COLORS, AREA_COLORS } from '../../lib/constants'
 
 interface ProjectWithArea extends Project {
   requests?: { requester_area: string; request_number?: string } | null
@@ -11,34 +12,8 @@ interface Props {
   onClick: () => void
   users?: User[]
   onAssign?: (flowId: string, userId: string) => void
-}
-
-const AVATAR_COLORS = [
-  'bg-blue-500', 'bg-purple-500', 'bg-green-500',
-  'bg-orange-500', 'bg-pink-500', 'bg-teal-500', 'bg-indigo-500',
-]
-function getAvatarColor(name: string) {
-  let h = 0
-  for (const c of name) h = c.charCodeAt(0) + ((h << 5) - h)
-  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
-}
-function getInitials(name: string) {
-  return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
-}
-
-const PRIORITY_COLORS: Record<string, string> = {
-  low:    'bg-green-100 text-green-800 border-green-200',
-  medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  high:   'bg-orange-100 text-orange-800 border-orange-200',
-  urgent: 'bg-red-100 text-red-800 border-red-200',
-}
-
-const AREA_COLORS: Record<string, string> = {
-  SAQ:  'bg-blue-100 text-blue-800',
-  DDC:  'bg-purple-100 text-purple-800',
-  QA:   'bg-teal-100 text-teal-800',
-  ATC:  'bg-orange-100 text-orange-800',
-  AASS: 'bg-pink-100 text-pink-800',
+  selected?: boolean
+  onSelect?: (projectId: string) => void
 }
 
 function getDueDateBadge(dueDate?: string | null) {
@@ -62,7 +37,7 @@ function getSlaTargetBadge(slaTargetDate?: string | null) {
   return { label: `🎯 ${new Date(slaTargetDate + 'T00:00:00').toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })}`, cls: 'bg-green-50 text-green-700 border border-green-200' }
 }
 
-export default function ProjectCard({ project, flow, onClick, users = [], onAssign }: Props) {
+export default function ProjectCard({ project, flow, onClick, users = [], onAssign, selected, onSelect }: Props) {
   const area = project.requests?.requester_area
   const requestNumber = project.requests?.request_number ?? project.project_number
   const areaColorClass = area ? (AREA_COLORS[area] ?? 'bg-gray-100 text-gray-600') : ''
@@ -99,8 +74,18 @@ export default function ProjectCard({ project, flow, onClick, users = [], onAssi
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-lg shadow-sm border border-gray-200 p-3.5 mb-3 hover:shadow-md transition-shadow cursor-pointer"
+      className={`relative bg-white rounded-lg shadow-sm border p-3.5 mb-3 hover:shadow-md transition-shadow cursor-pointer group/card ${
+        selected ? 'border-blue-400 ring-1 ring-blue-200' : 'border-gray-200'
+      }`}
     >
+      {onSelect && (
+        <div
+          className={`absolute top-2 right-2 z-10 transition-opacity ${selected ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100'}`}
+          onClick={e => { e.stopPropagation(); onSelect(project.id) }}
+        >
+          <input type="checkbox" checked={selected ?? false} readOnly className="w-4 h-4 cursor-pointer accent-blue-600" />
+        </div>
+      )}
       {/* Título + blocked */}
       <div className="flex items-start justify-between mb-2">
         <h3 className="font-semibold text-gray-900 text-sm flex-1 leading-snug line-clamp-2">

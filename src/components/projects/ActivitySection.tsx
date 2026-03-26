@@ -1,4 +1,5 @@
 import { useActivityLog } from '../../hooks/useActivityLog'
+import { useUsers } from '../../hooks/useUsers'
 
 const ACTION_LABELS: Record<string, string> = {
   status_changed:   'Estado cambiado',
@@ -9,6 +10,12 @@ const ACTION_LABELS: Record<string, string> = {
   edited:           'Proyecto editado',
   sla_started:      'SLA iniciado',
   sla_completed:    'SLA completado',
+  assigned:         'Responsable asignado',
+  reassigned:       'Responsable reasignado',
+  comment_added:    'Comentario agregado',
+  due_date_changed: 'Fecha de vencimiento cambiada',
+  project_deleted:  'Proyecto eliminado',
+  project_restored: 'Proyecto restaurado',
 }
 
 const ACTION_ICONS: Record<string, string> = {
@@ -20,6 +27,12 @@ const ACTION_ICONS: Record<string, string> = {
   edited:           '✏️',
   sla_started:      '⏱',
   sla_completed:    '🏁',
+  assigned:         '👤',
+  reassigned:       '🔀',
+  comment_added:    '💬',
+  due_date_changed: '📅',
+  project_deleted:  '🗑',
+  project_restored: '↩️',
 }
 
 const PHASE_LABELS: Record<string, string> = {
@@ -44,6 +57,8 @@ interface Props {
 
 export default function ActivitySection({ projectId }: Props) {
   const { logs, loading } = useActivityLog(projectId)
+  const { users } = useUsers()
+  const userName = (id: string | null) => id ? (users.find(u => u.id === id)?.full_name ?? id.slice(0, 8)) : '—'
 
   if (loading) {
     return <div className="text-center py-8 text-gray-400 text-sm">Cargando actividad...</div>
@@ -71,12 +86,12 @@ export default function ActivitySection({ projectId }: Props) {
             <div className="flex-1 min-w-0">
               <p className="text-sm text-gray-800">
                 {ACTION_LABELS[log.action] ?? log.action}
-                {d?.to && (
+                {d?.to && !['assigned', 'reassigned', 'due_date_changed'].includes(log.action) && (
                   <span className="font-semibold text-gray-900">
                     {' → '}{PHASE_LABELS[d.to] ?? d.to}
                   </span>
                 )}
-                {d?.from && d?.to && (
+                {d?.from && d?.to && !['assigned', 'reassigned', 'due_date_changed'].includes(log.action) && (
                   <span className="text-gray-500 text-xs">
                     {' '}(desde: {PHASE_LABELS[d.from] ?? d.from})
                   </span>
@@ -94,8 +109,8 @@ export default function ActivitySection({ projectId }: Props) {
               {log.action === 'sla_started' && (
                 <p className="text-xs text-gray-500 mt-0.5">
                   {d?.request_number && <span>Solicitud {d.request_number} · </span>}
-                  {d?.sla_due_date
-                    ? <>Fecha límite: <span className="font-medium">{new Date(d.sla_due_date + 'T12:00:00').toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}</span></>
+                  {d?.sla_target_date
+                    ? <>Fecha límite: <span className="font-medium">{new Date(d.sla_target_date + 'T12:00:00').toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })}</span></>
                     : 'Sin fecha límite definida'
                   }
                 </p>
@@ -129,6 +144,44 @@ export default function ActivitySection({ projectId }: Props) {
                 </div>
               )}
 
+              {/* Assigned / Reassigned */}
+              {(log.action === 'assigned' || log.action === 'reassigned') && (
+                <div className="mt-0.5 space-y-0.5">
+                  {log.action === 'reassigned' && d?.from && (
+                    <p className="text-xs text-gray-500">
+                      Anterior: <span className="font-medium">{userName(d.from)}</span>
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    Asignado a: <span className="font-medium text-blue-700">{userName(d?.to)}</span>
+                    {d?.flow_type && (
+                      <span className="text-gray-400 ml-1">({d.flow_type === 'development' ? '💻' : '📋'})</span>
+                    )}
+                  </p>
+                </div>
+              )}
+
+              {/* Comment added */}
+              {log.action === 'comment_added' && d?.preview && (
+                <p className="text-xs text-gray-500 mt-0.5 italic line-clamp-2">
+                  "{d.preview}{d.preview.length >= 80 ? '…' : ''}"
+                </p>
+              )}
+
+              {/* Due date changed */}
+              {log.action === 'due_date_changed' && (
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {d?.from
+                    ? <span>Anterior: <span className="font-medium">{new Date(d.from + 'T00:00:00').toLocaleDateString('es-PE')}</span> → </span>
+                    : <span>Sin fecha → </span>
+                  }
+                  {d?.to
+                    ? <span className="font-medium">{new Date(d.to + 'T00:00:00').toLocaleDateString('es-PE')}</span>
+                    : <span>Sin fecha</span>
+                  }
+                </p>
+              )}
+
               {d?.reason && (
                 <p className="text-xs text-gray-500 mt-0.5 italic">"{d.reason}"</p>
               )}
@@ -140,8 +193,11 @@ export default function ActivitySection({ projectId }: Props) {
               <p className="text-xs text-gray-400 mt-1">
                 {new Date(log.created_at).toLocaleString('es-PE', {
                   day: '2-digit', month: 'short', year: 'numeric',
-                  hour: '2-digit', minute: '2-digit',
+                  hour: '2-digit', minute: '2-digit', hour12: false,
                 })}
+                {log.user_id && (
+                  <span className="ml-1 text-gray-400">· por <span className="font-medium text-gray-500">{userName(log.user_id)}</span></span>
+                )}
               </p>
             </div>
           </div>

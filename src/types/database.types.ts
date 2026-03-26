@@ -8,12 +8,6 @@ export interface User {
   updated_at: string;
 }
 
-export interface Tag {
-  id: string;
-  name: string;
-  color: string;
-  created_at: string;
-}
 
 export interface Request {
   id: string;
@@ -43,13 +37,15 @@ export interface Project {
   description: string;
   project_type: 'development' | 'administrative' | 'dual';
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'active' | 'completed' | 'archived';
+  status: 'active' | 'completed' | 'archived' | 'deleted';
   start_date?: string;
   due_date?: string;
+  sla_target_date?: string;
+  project_number?: string;
   is_blocked: boolean;
   blocked_reason?: string;
   blocked_since?: string;
-  tag_ids: string[];
+
   created_at: string;
   updated_at: string;
   project_flows?: ProjectFlow[];
@@ -83,6 +79,17 @@ export interface Comment {
   user_id?: string;
   content: string;
   created_at: string;
+}
+
+export interface Notification {
+  id: string
+  user_id: string
+  type: string
+  title: string
+  message?: string
+  project_id?: string
+  read: boolean
+  created_at: string
 }
 
 export interface ActivityLog {

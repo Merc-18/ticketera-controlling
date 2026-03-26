@@ -1,4 +1,5 @@
 import type { Project, ProjectFlow } from '../../types/database.types'
+import { PRIORITY_COLORS, AREA_COLORS, PHASE_LABELS } from '../../lib/constants'
 
 interface ProjectWithRelations extends Project {
   project_flows?: ProjectFlow[]
@@ -10,28 +11,6 @@ interface Props {
   boardType: 'development' | 'administrative'
   onProjectClick: (item: { project: ProjectWithRelations; flow: ProjectFlow }) => void
   status: 'completed' | 'archived'
-}
-
-const PRIORITY_COLORS: Record<string, string> = {
-  low:    'bg-green-100 text-green-800 border-green-200',
-  medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  high:   'bg-orange-100 text-orange-800 border-orange-200',
-  urgent: 'bg-red-100 text-red-800 border-red-200',
-}
-
-const AREA_COLORS: Record<string, string> = {
-  SAQ:  'bg-blue-100 text-blue-800',
-  DDC:  'bg-purple-100 text-purple-800',
-  QA:   'bg-teal-100 text-teal-800',
-  ATC:  'bg-orange-100 text-orange-800',
-  AASS: 'bg-pink-100 text-pink-800',
-}
-
-const PHASE_LABELS: Record<string, string> = {
-  backlog: 'Backlog', design: 'Design', dev: 'Development',
-  testing: 'Testing', deploy: 'Deploy', done: 'Done',
-  ready_to_start: 'Ready to Start', discovery: 'Discovery',
-  build: 'Build', uat_validation: 'UAT/Validation', deployed: 'Deployed',
 }
 
 export default function ProjectListView({ projects, boardType, onProjectClick, status }: Props) {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useUsers } from '../../hooks/useUsers'
 import type { User } from '../../types/database.types'
+import { PRIORITY_COLORS, PRIORITY_LABEL, getAvatarColor, getInitials } from '../../lib/constants'
 
 interface FlowWithProject {
   id: string
@@ -19,19 +20,6 @@ interface FlowWithProject {
     is_blocked: boolean
   } | null
 }
-
-const PRIORITY_BADGE: Record<string, string> = {
-  urgent: 'bg-red-100 text-red-800',
-  high:   'bg-orange-100 text-orange-800',
-  medium: 'bg-yellow-100 text-yellow-800',
-  low:    'bg-green-100 text-green-800',
-}
-
-const PRIORITY_LABEL: Record<string, string> = {
-  urgent: '🔴 Urgente', high: '🟠 Alta', medium: '🟡 Media', low: '🟢 Baja',
-}
-
-
 
 function isOverdue(dueDate: string | null) {
   if (!dueDate) return false
@@ -259,14 +247,6 @@ function UserCard({
   onToggle: () => void
 }) {
   const displayName = user.full_name
-  const AVATAR_COLORS = ['bg-blue-500','bg-purple-500','bg-green-500','bg-orange-500','bg-pink-500','bg-teal-500','bg-indigo-500']
-  function getAvatarColor(n: string) {
-    let h = 0; for (const c of n) h = c.charCodeAt(0) + ((h << 5) - h)
-    return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
-  }
-  function getInitials(n: string) {
-    return n.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
-  }
 
   const ROLE_BADGE: Record<string, string> = {
     admin: 'bg-red-100 text-red-700', developer: 'bg-blue-100 text-blue-700', viewer: 'bg-gray-100 text-gray-500',
@@ -371,7 +351,7 @@ function UserCard({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-800 truncate">{p.title}</p>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${PRIORITY_BADGE[p.priority] ?? ''}`}>
+                      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${PRIORITY_COLORS[p.priority] ?? ''}`}>
                         {PRIORITY_LABEL[p.priority] ?? p.priority}
                       </span>
                       <span className="text-xs text-gray-400 capitalize">

@@ -5,37 +5,16 @@ import ChecklistSection from './ChecklistSection'
 import ActivitySection from './ActivitySection'
 import { useUsers } from '../../hooks/useUsers'
 import { supabase } from '../../lib/supabase'
+import { getAvatarColor, getInitials, AREA_COLORS, PHASE_LABELS } from '../../lib/constants'
 
 interface Props {
   project: Project & { requests?: { requester_area: string; requester_name: string; request_type: string } | null }
   flows: ProjectFlow[]
   onClose: () => void
   onUpdate?: () => void
+  onDelete?: (projectId: string) => Promise<void>
   updateProject: (id: string, updates: Partial<Project>) => Promise<void>
   updateFlowDetails?: (flowId: string, updates: { progress?: number; assigned_to?: string }) => Promise<void>
-}
-
-const AVATAR_COLORS = ['bg-blue-500','bg-purple-500','bg-green-500','bg-orange-500','bg-pink-500','bg-teal-500','bg-indigo-500']
-function getAvatarColor(name: string) {
-  let h = 0; for (const c of name) h = c.charCodeAt(0) + ((h << 5) - h)
-  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
-}
-function getInitials(name: string) {
-  return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
-}
-
-const PHASE_LABELS: Record<string, string> = {
-  backlog: 'Backlog',
-  design: 'Design',
-  dev: 'Development',
-  testing: 'Testing',
-  deploy: 'Deploy',
-  done: 'Done',
-  ready_to_start: 'Ready to Start',
-  discovery: 'Discovery',
-  build: 'Build',
-  uat_validation: 'UAT/Validation',
-  deployed: 'Deployed',
 }
 
 const PRIORITY_OPTIONS = [
@@ -47,21 +26,16 @@ const PRIORITY_OPTIONS = [
 
 const KNOWN_AREAS = ['SAQ', 'DDC', 'QA', 'ATC', 'AASS']
 
-const AREA_COLORS: Record<string, string> = {
-  SAQ:  'bg-blue-100 text-blue-800 border-blue-200',
-  DDC:  'bg-purple-100 text-purple-800 border-purple-200',
-  QA:   'bg-teal-100 text-teal-800 border-teal-200',
-  ATC:  'bg-orange-100 text-orange-800 border-orange-200',
-  AASS: 'bg-pink-100 text-pink-800 border-pink-200',
-}
-
-export default function ProjectModal({ project, flows, onClose, onUpdate, updateProject, updateFlowDetails }: Props) {
+export default function ProjectModal({ project, flows, onClose, onUpdate, onDelete, updateProject, updateFlowDetails }: Props) {
   const { activeUsers } = useUsers()
   const [activeTab, setActiveTab] = useState<'details' | 'checklist' | 'comments' | 'activity'>('details')
   const [editMode, setEditMode] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showBlockForm, setShowBlockForm] = useState(false)
   const [showStatusConfirm, setShowStatusConfirm] = useState<'completed' | 'archived' | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const [editData, setEditData] = useState({
     title: project.title,
@@ -209,6 +183,7 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
   }
 
   return (
+    <>
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={onClose}>
       <div
         className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
@@ -276,7 +251,18 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
               )}
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl ml-4">✕</button>
+          <div className="flex items-center gap-2 ml-4">
+            {onDelete && (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded transition font-medium"
+                title="Eliminar proyecto"
+              >
+                🗑 Eliminar
+              </button>
+            )}
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
+          </div>
         </div>
 
         {/* ── TABS ── */}
@@ -675,5 +661,52 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, update
         </div>
       </div>
     </div>
+
+    {/* Delete Confirmation Modal */}
+    {showDeleteConfirm && (
+      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-[60]">
+        <div className="bg-white rounded-lg max-w-sm w-full p-6 shadow-2xl">
+          <h3 className="text-lg font-bold text-gray-900 mb-2">🗑 Eliminar proyecto</h3>
+          <p className="text-sm text-gray-600 mb-1">
+            ¿Estás seguro de que querés eliminar <span className="font-semibold text-gray-900">"{project.title}"</span>?
+          </p>
+          <p className="text-xs text-gray-400 mb-6">
+            El registro del requerimiento asociado se mantendrá con una indicación de que el proyecto fue eliminado.
+          </p>
+          {deleteError && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mb-3">{deleteError}</p>
+          )}
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={deleting}
+              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition text-sm"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={async (e) => {
+                e.stopPropagation()
+                setDeleting(true)
+                setDeleteError(null)
+                try {
+                  await onDelete!(project.id)
+                  onClose()
+                } catch (err: any) {
+                  setDeleteError(err?.message ?? 'Error al eliminar')
+                } finally {
+                  setDeleting(false)
+                }
+              }}
+              disabled={deleting}
+              className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition text-sm disabled:opacity-50"
+            >
+              {deleting ? 'Eliminando...' : 'Sí, eliminar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }

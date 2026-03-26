@@ -378,6 +378,20 @@ export function useProjects() {
     loadProjects(statusFilter, newLimit)
   }
 
+  const bulkUpdateProjects = async (ids: string[], updates: Partial<Project>) => {
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .in('id', ids)
+      if (error) throw error
+      await loadProjects()
+    } catch (err: any) {
+      console.error('Error bulk updating projects:', err)
+      throw err
+    }
+  }
+
   return {
     projects,
     loading,
@@ -392,5 +406,6 @@ export function useProjects() {
     updateFlowDetails,
     createProject,
     deleteProject,
+    bulkUpdateProjects,
   }
 }

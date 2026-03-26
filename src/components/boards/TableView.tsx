@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Project, ProjectFlow } from '../../types/database.types'
+import { PRIORITY_COLORS, PHASE_LABELS, PRIORITY_LABEL } from '../../lib/constants'
 
 interface ProjectWithRelations extends Project {
   project_flows?: ProjectFlow[]
@@ -10,30 +11,13 @@ interface Props {
   projects: ProjectWithRelations[]
   boardType: 'development' | 'administrative'
   onProjectClick: (item: { project: ProjectWithRelations; flow: ProjectFlow }) => void
+  loading?: boolean
 }
 
 type SortKey = 'title' | 'priority' | 'area' | 'phase' | 'progress' | 'due_date' | 'created_at'
 type SortDir = 'asc' | 'desc'
 
 const PRIORITY_ORDER: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 }
-
-const PRIORITY_BADGE: Record<string, string> = {
-  urgent: 'bg-red-100 text-red-800 border-red-200',
-  high:   'bg-orange-100 text-orange-800 border-orange-200',
-  medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  low:    'bg-green-100 text-green-800 border-green-200',
-}
-
-const PHASE_LABELS: Record<string, string> = {
-  backlog: 'Backlog', design: 'Design', dev: 'Development',
-  testing: 'Testing', deploy: 'Deploy', done: 'Done',
-  ready_to_start: 'Ready to Start', discovery: 'Discovery',
-  build: 'Build', uat_validation: 'UAT/Validation', deployed: 'Deployed',
-}
-
-const PRIORITY_LABELS: Record<string, string> = {
-  urgent: '🔴 Urgente', high: '🟠 Alta', medium: '🟡 Media', low: '🟢 Baja',
-}
 
 function exportTableCSV(sorted: Array<{ project: ProjectWithRelations; flow: ProjectFlow }>) {
   const PRIORITY_ES: Record<string, string> = { urgent: 'Urgente', high: 'Alta', medium: 'Media', low: 'Baja' }
@@ -59,7 +43,7 @@ function exportTableCSV(sorted: Array<{ project: ProjectWithRelations; flow: Pro
   URL.revokeObjectURL(url)
 }
 
-export default function TableView({ projects, boardType, onProjectClick }: Props) {
+export default function TableView({ projects, boardType, onProjectClick, loading }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('created_at')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
@@ -102,6 +86,28 @@ export default function TableView({ projects, boardType, onProjectClick }: Props
           </span>
         </span>
       </th>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border shadow-sm overflow-hidden animate-pulse">
+        <div className="bg-gray-50 border-b h-10" />
+        {[...Array(7)].map((_, i) => (
+          <div key={i} className="flex items-center border-b px-4 gap-6" style={{ height: 52 }}>
+            <div className="flex-1 h-3 bg-gray-200 rounded" style={{ maxWidth: 220 }} />
+            <div className="h-5 w-14 bg-gray-100 rounded" />
+            <div className="w-12 h-3 bg-gray-100 rounded" />
+            <div className="w-16 h-3 bg-gray-100 rounded" />
+            <div className="flex items-center gap-2">
+              <div className="w-20 h-2 bg-gray-200 rounded-full" />
+              <div className="w-8 h-3 bg-gray-100 rounded" />
+            </div>
+            <div className="w-16 h-3 bg-gray-100 rounded" />
+            <div className="w-16 h-3 bg-gray-100 rounded" />
+          </div>
+        ))}
+      </div>
     )
   }
 
@@ -151,8 +157,8 @@ export default function TableView({ projects, boardType, onProjectClick }: Props
 
                   {/* Prioridad */}
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium border ${PRIORITY_BADGE[project.priority]}`}>
-                      {PRIORITY_LABELS[project.priority]}
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium border ${PRIORITY_COLORS[project.priority]}`}>
+                      {PRIORITY_LABEL[project.priority]}
                     </span>
                   </td>
 

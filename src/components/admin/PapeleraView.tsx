@@ -35,7 +35,7 @@ export default function PapeleraView() {
       .select('id, title, priority, project_type, updated_at, project_number, requests(request_number)')
       .eq('status', 'deleted')
       .order('updated_at', { ascending: false })
-    setProjects((data as DeletedProject[]) || [])
+    setProjects((data as unknown as DeletedProject[]) || [])
     setLoading(false)
   }
 

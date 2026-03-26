@@ -10,7 +10,9 @@ import NewProjectModal from '../projects/NewProjectModal'
 import { useProjects } from '../../hooks/useProjects'
 import { useUsers } from '../../hooks/useUsers'
 import { useAuth } from '../../hooks/useAuth'
+import { toast } from '../../lib/toast'
 import type { ProjectFlow } from '../../types/database.types'
+import { AREAS } from '../../lib/constants'
 
 
 type BoardType = 'development' | 'administrative'
@@ -48,8 +50,6 @@ const STATUS_OPTIONS = [
   { value: 'archived',  label: '📦 Archivados',   activeClass: 'bg-gray-600 text-white' },
 ] as const
 
-const AREAS = ['AASS', 'ATC', 'DDC', 'QA', 'SAQ']
-
 const PRIORITY_OPTS = [
   { value: 'all',    label: 'Prioridad' },
   { value: 'urgent', label: '🔴 Urgente' },
@@ -66,11 +66,12 @@ const VIEW_MODES: { value: ViewMode; label: string; icon: string }[] = [
 ]
 
 export default function KanbanBoard({ boardType, openProjectId, onOpenHandled }: Props) {
-  const { projects, loading, hasMore, loadMore, statusFilter, setStatusFilter, updateProjectFlow, updateProject, updateFlowDetails, createProject, deleteProject, reload } = useProjects()
+  const { projects, loading, hasMore, loadMore, statusFilter, setStatusFilter, updateProjectFlow, updateProject, updateFlowDetails, createProject, deleteProject, reload, bulkUpdateProjects } = useProjects()
   const { activeUsers } = useUsers()
   const { user: currentUser } = useAuth()
   const [selectedProject, setSelectedProject] = useState<{ project: any; flow: ProjectFlow } | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [priorityFilter, setPriorityFilter] = useState(() => localStorage.getItem('kanban_priorityFilter') || 'all')
   const [areaFilter, setAreaFilter]         = useState(() => localStorage.getItem('kanban_areaFilter') || 'all')
   const [myProjectsOnly, setMyProjectsOnly] = useState(() => localStorage.getItem('kanban_myProjectsOnly') === 'true')
@@ -84,6 +85,7 @@ export default function KanbanBoard({ boardType, openProjectId, onOpenHandled }:
   useEffect(() => { localStorage.setItem('kanban_areaFilter', areaFilter) },         [areaFilter])
   useEffect(() => { localStorage.setItem('kanban_myProjectsOnly', String(myProjectsOnly)) }, [myProjectsOnly])
   useEffect(() => { localStorage.setItem('kanban_viewMode', viewMode) },              [viewMode])
+  useEffect(() => { setSelectedIds([]) }, [statusFilter])
 
   // Sincronizar selectedProject con datos frescos después de cada reload
   useEffect(() => {
@@ -153,15 +155,47 @@ export default function KanbanBoard({ boardType, openProjectId, onOpenHandled }:
   const filteredCount = filteredProjects.length
   const totalCount = projects.length
 
-  // Solo mostrar spinner en la carga inicial (sin proyectos aún)
+  // Skeleton en la carga inicial (sin proyectos aún)
   if (loading && projects.length === 0) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-          <p className="text-gray-600">Cargando proyectos...</p>
+      <>
+        <div className="flex items-center gap-4 mb-4">
+          <div>
+            <div className="h-7 w-56 bg-gray-200 rounded animate-pulse mb-1" />
+            <div className="h-3 w-64 bg-gray-100 rounded animate-pulse" />
+          </div>
+          <div className="h-10 w-72 bg-gray-100 rounded-lg animate-pulse" />
         </div>
-      </div>
+        <div className="flex items-center gap-2 mb-4">
+          {[1, 2, 3].map(i => <div key={i} className="h-8 w-24 bg-gray-100 rounded-full animate-pulse" />)}
+          <div className="ml-auto h-8 w-36 bg-gray-200 rounded-lg animate-pulse" />
+        </div>
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {phases.map((phase, ci) => (
+            <div key={phase.id} className="flex-shrink-0 w-80">
+              <div className={`rounded-t-lg p-3 ${phase.color} opacity-50`}>
+                <div className="h-4 w-28 bg-white/40 rounded" />
+              </div>
+              <div className="bg-gray-50 rounded-b-lg p-3 space-y-3 min-h-[200px]">
+                {Array.from({ length: ci < 2 ? 3 : ci < 4 ? 2 : 1 }).map((_, j) => (
+                  <div key={j} className="bg-white rounded-lg border border-gray-100 p-3.5 animate-pulse">
+                    <div className="h-3 bg-gray-200 rounded mb-2 w-4/5" />
+                    <div className="h-3 bg-gray-100 rounded mb-3 w-3/5" />
+                    <div className="flex gap-1 mb-2.5">
+                      <div className="h-4 bg-gray-200 rounded w-12" />
+                      <div className="h-4 bg-gray-100 rounded w-8" />
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div className="h-3 bg-gray-100 rounded w-16" />
+                      <div className="h-5 w-5 bg-gray-200 rounded-full" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </>
     )
   }
 
@@ -297,6 +331,7 @@ export default function KanbanBoard({ boardType, openProjectId, onOpenHandled }:
           projects={filteredProjects as any}
           boardType={boardType}
           onProjectClick={setSelectedProject}
+          loading={loading}
         />
       )}
 
@@ -306,6 +341,7 @@ export default function KanbanBoard({ boardType, openProjectId, onOpenHandled }:
           projects={filteredProjects as any}
           boardType={boardType}
           onProjectClick={setSelectedProject}
+          loading={loading}
         />
       )}
 
@@ -314,6 +350,7 @@ export default function KanbanBoard({ boardType, openProjectId, onOpenHandled }:
         <RoadmapView
           projects={filteredProjects as any}
           onProjectClick={setSelectedProject}
+          loading={loading}
         />
       )}
 
@@ -343,6 +380,8 @@ export default function KanbanBoard({ boardType, openProjectId, onOpenHandled }:
                 onProjectClick={setSelectedProject}
                 users={activeUsers}
                 onAssign={(flowId, userId) => updateFlowDetails(flowId, { assigned_to: userId }).then(reload)}
+                selectedIds={selectedIds}
+                onSelect={id => setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
               />
             ))}
           </div>
@@ -367,6 +406,50 @@ export default function KanbanBoard({ boardType, openProjectId, onOpenHandled }:
             className="px-6 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition shadow-sm"
           >
             Cargar más proyectos...
+          </button>
+        </div>
+      )}
+
+      {/* ── BULK ACTION BAR ── */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white border border-gray-200 shadow-2xl rounded-2xl px-5 py-3 flex items-center gap-4 min-w-max">
+          <span className="text-sm font-semibold text-gray-700">
+            {selectedIds.length} seleccionado{selectedIds.length !== 1 ? 's' : ''}
+          </span>
+          <div className="h-5 w-px bg-gray-200" />
+          <select
+            defaultValue=""
+            onChange={async e => {
+              const val = e.target.value
+              if (!val) return
+              await bulkUpdateProjects(selectedIds, { priority: val as any })
+              setSelectedIds([])
+              toast.success(`Prioridad actualizada en ${selectedIds.length} proyecto${selectedIds.length !== 1 ? 's' : ''}`)
+            }}
+            className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 cursor-pointer outline-none hover:border-gray-300"
+          >
+            <option value="" disabled>Cambiar prioridad...</option>
+            <option value="urgent">🔴 Urgente</option>
+            <option value="high">🟠 Alta</option>
+            <option value="medium">🟡 Media</option>
+            <option value="low">🟢 Baja</option>
+          </select>
+          <button
+            onClick={async () => {
+              const count = selectedIds.length
+              await bulkUpdateProjects(selectedIds, { status: 'archived' as any })
+              setSelectedIds([])
+              toast.success(`${count} proyecto${count !== 1 ? 's' : ''} archivado${count !== 1 ? 's' : ''}`)
+            }}
+            className="text-sm text-orange-600 hover:text-orange-700 font-medium transition"
+          >
+            📦 Archivar
+          </button>
+          <button
+            onClick={() => setSelectedIds([])}
+            className="text-sm text-gray-400 hover:text-gray-600 transition"
+          >
+            ✕ Cancelar
           </button>
         </div>
       )}
