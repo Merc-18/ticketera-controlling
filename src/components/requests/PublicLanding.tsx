@@ -48,7 +48,7 @@ function LoginModal({ onClose }: { onClose: () => void }) {
               required
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="tu-email@gilat.com"
+              placeholder="tu-email@empresa.com"
               disabled={loading}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition text-sm"
             />
@@ -99,7 +99,6 @@ export default function PublicLanding() {
       <nav className="w-full px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-2xl font-bold text-white">🎯 Ticketera Controlling</span>
-          <span className="text-blue-200 text-sm hidden sm:inline">· Gilat</span>
         </div>
         <button
           onClick={() => setShowLogin(true)}
@@ -156,7 +155,7 @@ export default function PublicLanding() {
           </div>
 
           <p className="text-center text-blue-200 text-xs mt-10">
-            Equipo Controlling · Gilat
+            Equipo Controlling
           </p>
         </div>
       </div>

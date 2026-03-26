@@ -36,7 +36,7 @@ export default function LoginForm() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               🎯 Ticketera Controlling
             </h1>
-            <p className="text-gray-600">Gilat Network</p>
+            <p className="text-gray-600">Sistema de Gestión</p>
           </div>
 
           {/* Formulario */}
@@ -53,7 +53,7 @@ export default function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition"
-                placeholder="tu-email@gilat.com"
+                placeholder="tu-email@empresa.com"
                 disabled={loading}
               />
             </div>
