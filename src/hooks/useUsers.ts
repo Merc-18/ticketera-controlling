@@ -38,7 +38,7 @@ export function useUsers() {
     email: string
     password: string
     full_name: string
-    role: 'admin' | 'developer' | 'viewer'
+    role: 'superadmin' | 'admin' | 'developer' | 'viewer'
   }): Promise<{ sessionLost: boolean }> => {
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: userData.email,
@@ -75,7 +75,7 @@ export function useUsers() {
     userId: string,
     updates: {
       full_name?: string
-      role?: 'admin' | 'developer' | 'viewer'
+      role?: 'superadmin' | 'admin' | 'developer' | 'viewer'
       is_active?: boolean
     }
   ) => {

@@ -1,28 +1,38 @@
 import { useState } from 'react'
 import type { User } from '../../types/database.types'
 
-type RoleOption = 'admin' | 'developer' | 'viewer'
+type RoleOption = 'superadmin' | 'admin' | 'developer' | 'viewer'
 
 interface Props {
-  user?: User           // Si se pasa → modo edición; si no → modo creación
+  user?: User
+  currentUserRole: RoleOption
   onClose: () => void
   onCreate?: (data: { email: string; password: string; full_name: string; role: RoleOption }) => Promise<{ sessionLost: boolean }>
   onUpdate?: (userId: string, data: { full_name?: string; role?: RoleOption; is_active?: boolean }) => Promise<void>
 }
 
-const ROLES: { value: RoleOption; label: string; desc: string; color: string }[] = [
-  { value: 'admin',     label: 'Admin',     desc: 'Acceso total: gestión de usuarios, proyectos y configuración', color: 'bg-red-100 text-red-800 border-red-200' },
-  { value: 'developer', label: 'Developer', desc: 'Gestión de proyectos, actualizar fases y progreso',             color: 'bg-blue-100 text-blue-800 border-blue-200' },
-  { value: 'viewer',    label: 'Viewer',    desc: 'Solo lectura: puede ver proyectos y dashboard',                 color: 'bg-gray-100 text-gray-700 border-gray-200' },
+const ALL_ROLES: { value: RoleOption; label: string; desc: string; color: string }[] = [
+  { value: 'superadmin', label: 'Superadmin', desc: 'Control total del sistema, único que puede gestionar admins', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+  { value: 'admin',      label: 'Admin',      desc: 'Gestión de proyectos, solicitudes y usuarios developer/viewer', color: 'bg-red-100 text-red-800 border-red-200' },
+  { value: 'developer',  label: 'Developer',  desc: 'Gestión de proyectos, actualizar fases y progreso',            color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { value: 'viewer',     label: 'Viewer',     desc: 'Solo lectura: puede ver proyectos y dashboard',                color: 'bg-gray-100 text-gray-700 border-gray-200' },
 ]
 
-export default function UserModal({ user, onClose, onCreate, onUpdate }: Props) {
-  const isEdit = !!user
+export default function UserModal({ user, currentUserRole, onClose, onCreate, onUpdate }: Props) {
+  const isEdit      = !!user
+  const isSuperAdmin = currentUserRole === 'superadmin'
+
+  // Roles disponibles según quien edita
+  const availableRoles = isSuperAdmin
+    ? ALL_ROLES
+    : ALL_ROLES.filter(r => r.value === 'developer' || r.value === 'viewer')
+
+  const defaultRole: RoleOption = isSuperAdmin ? (user?.role ?? 'developer') : 'developer'
 
   const [fullName, setFullName] = useState(user?.full_name ?? '')
   const [email,    setEmail]    = useState(user?.email ?? '')
   const [password, setPassword] = useState('')
-  const [role,     setRole]     = useState<RoleOption>(user?.role ?? 'developer')
+  const [role,     setRole]     = useState<RoleOption>(defaultRole)
   const [isActive, setIsActive] = useState(user?.is_active !== false)
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState<string | null>(null)
@@ -41,12 +51,7 @@ export default function UserModal({ user, onClose, onCreate, onUpdate }: Props) 
         onClose()
       } else if (!isEdit && onCreate) {
         const result = await onCreate({ email: email.trim(), password, full_name: fullName.trim(), role })
-        if (result.sessionLost) {
-          // La sesión del admin fue reemplazada → el ProtectedRoute redirigirá a login
-          // No cerramos el modal; el app se encargará
-        } else {
-          onClose()
-        }
+        if (!result.sessionLost) onClose()
       }
     } catch (err: any) {
       setError(err.message ?? 'Error al guardar usuario')
@@ -57,10 +62,8 @@ export default function UserModal({ user, onClose, onCreate, onUpdate }: Props) 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={onClose}>
-      <div
-        className="bg-white rounded-xl max-w-lg w-full shadow-xl"
-        onClick={e => e.stopPropagation()}
-      >
+      <div className="bg-white rounded-xl max-w-lg w-full shadow-xl" onClick={e => e.stopPropagation()}>
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <h2 className="text-xl font-bold text-gray-900">
@@ -83,7 +86,7 @@ export default function UserModal({ user, onClose, onCreate, onUpdate }: Props) 
             />
           </div>
 
-          {/* Email (solo en creación) */}
+          {/* Email (solo creación) */}
           {!isEdit && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
@@ -97,7 +100,7 @@ export default function UserModal({ user, onClose, onCreate, onUpdate }: Props) 
             </div>
           )}
 
-          {/* Contraseña (solo en creación) */}
+          {/* Contraseña (solo creación) */}
           {!isEdit && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña *</label>
@@ -115,7 +118,7 @@ export default function UserModal({ user, onClose, onCreate, onUpdate }: Props) 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Rol *</label>
             <div className="space-y-2">
-              {ROLES.map(r => (
+              {availableRoles.map(r => (
                 <label
                   key={r.value}
                   className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition ${
@@ -139,9 +142,14 @@ export default function UserModal({ user, onClose, onCreate, onUpdate }: Props) 
                 </label>
               ))}
             </div>
+            {!isSuperAdmin && (
+              <p className="text-xs text-gray-400 mt-2">
+                🔒 Solo un Superadmin puede asignar roles Admin o Superadmin
+              </p>
+            )}
           </div>
 
-          {/* Activo / Inactivo (solo en edición) */}
+          {/* Activo / Inactivo (solo edición) */}
           {isEdit && (
             <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3 border">
               <div>
@@ -173,24 +181,16 @@ export default function UserModal({ user, onClose, onCreate, onUpdate }: Props) 
           {!isEdit && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-xs text-amber-700">
               <strong>Nota:</strong> Si la confirmación de email está desactivada en Supabase, tu sesión
-              se cerrará automáticamente al crear el usuario. Vuelve a iniciar sesión con tu cuenta de admin.
+              se cerrará automáticamente al crear el usuario. Vuelve a iniciar sesión con tu cuenta.
             </div>
           )}
 
           {/* Acciones */}
           <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition"
-            >
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition">
               Cancelar
             </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-5 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 transition"
-            >
+            <button type="submit" disabled={saving} className="px-5 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 transition">
               {saving ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Crear usuario'}
             </button>
           </div>

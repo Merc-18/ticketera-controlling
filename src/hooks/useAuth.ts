@@ -68,7 +68,8 @@ export function useAuth() {
     loading,
     signIn,
     signOut,
-    isAdmin: user?.role === 'admin',
+    isSuperAdmin: user?.role === 'superadmin',
+    isAdmin: user?.role === 'admin' || user?.role === 'superadmin',
     isDeveloper: user?.role === 'developer',
     isViewer: user?.role === 'viewer',
   }

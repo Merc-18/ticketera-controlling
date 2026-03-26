@@ -1,43 +1,32 @@
 import { useState } from 'react'
 import { useUsers } from '../../hooks/useUsers'
+import { useAuth } from '../../hooks/useAuth'
 import UserModal from './UserModal'
+import { getAvatarColor, getInitials } from '../../lib/constants'
 import type { User } from '../../types/database.types'
 
-type RoleFilter = 'all' | 'admin' | 'developer' | 'viewer' | 'inactive'
+type RoleOption = 'superadmin' | 'admin' | 'developer' | 'viewer'
+type RoleFilter = 'all' | 'superadmin' | 'admin' | 'developer' | 'viewer' | 'inactive'
 
 const ROLE_BADGE: Record<string, string> = {
-  admin:     'bg-red-100 text-red-800 border-red-200',
-  developer: 'bg-blue-100 text-blue-800 border-blue-200',
-  viewer:    'bg-gray-100 text-gray-700 border-gray-200',
+  superadmin: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+  admin:      'bg-red-100 text-red-800 border-red-200',
+  developer:  'bg-blue-100 text-blue-800 border-blue-200',
+  viewer:     'bg-gray-100 text-gray-700 border-gray-200',
 }
 
 const ROLE_LABEL: Record<string, string> = {
-  admin:     'Admin',
-  developer: 'Developer',
-  viewer:    'Viewer',
-}
-
-const AVATAR_COLORS = [
-  'bg-blue-500', 'bg-purple-500', 'bg-green-500',
-  'bg-orange-500', 'bg-pink-500', 'bg-teal-500', 'bg-indigo-500',
-]
-
-function getAvatarColor(name: string) {
-  let hash = 0
-  for (const c of name) hash = c.charCodeAt(0) + ((hash << 5) - hash)
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
-}
-
-function getInitials(name: string) {
-  return name
-    .split(' ')
-    .slice(0, 2)
-    .map(w => w[0]?.toUpperCase() ?? '')
-    .join('')
+  superadmin: 'Superadmin',
+  admin:      'Admin',
+  developer:  'Developer',
+  viewer:     'Viewer',
 }
 
 export default function UserManagementPanel() {
   const { users, loading, error, reload, createUser, updateUser } = useUsers()
+  const { user: currentUser } = useAuth()
+  const currentUserRole = (currentUser?.role ?? 'viewer') as RoleOption
+  const isSuperAdmin = currentUserRole === 'superadmin'
 
   const [filter, setFilter]       = useState<RoleFilter>('all')
   const [search, setSearch]       = useState('')
@@ -45,7 +34,12 @@ export default function UserManagementPanel() {
   const [editing, setEditing]     = useState<User | null>(null)
   const [actionMsg, setActionMsg] = useState<string | null>(null)
 
-  const filtered = users.filter(u => {
+  // Admins cannot see superadmin users
+  const visibleUsers = isSuperAdmin
+    ? users
+    : users.filter(u => u.role !== 'superadmin')
+
+  const filtered = visibleUsers.filter(u => {
     const matchSearch = u.full_name.toLowerCase().includes(search.toLowerCase()) ||
                         u.email.toLowerCase().includes(search.toLowerCase())
     if (!matchSearch) return false
@@ -55,17 +49,18 @@ export default function UserManagementPanel() {
   })
 
   const stats = {
-    total:     users.filter(u => u.is_active !== false).length,
-    admin:     users.filter(u => u.role === 'admin'     && u.is_active !== false).length,
-    developer: users.filter(u => u.role === 'developer' && u.is_active !== false).length,
-    viewer:    users.filter(u => u.role === 'viewer'    && u.is_active !== false).length,
-    inactive:  users.filter(u => u.is_active === false).length,
+    total:      visibleUsers.filter(u => u.is_active !== false).length,
+    superadmin: users.filter(u => u.role === 'superadmin' && u.is_active !== false).length,
+    admin:      visibleUsers.filter(u => u.role === 'admin'      && u.is_active !== false).length,
+    developer:  visibleUsers.filter(u => u.role === 'developer'  && u.is_active !== false).length,
+    viewer:     visibleUsers.filter(u => u.role === 'viewer'     && u.is_active !== false).length,
+    inactive:   visibleUsers.filter(u => u.is_active === false).length,
   }
 
-  const handleCreate = async (data: { email: string; password: string; full_name: string; role: 'admin' | 'developer' | 'viewer' }) => {
+  const handleCreate = async (data: { email: string; password: string; full_name: string; role: RoleOption }) => {
     const result = await createUser(data)
     if (result.sessionLost) {
-      setActionMsg('Usuario creado. Tu sesión fue cerrada — vuelve a iniciar sesión como admin.')
+      setActionMsg('Usuario creado. Tu sesión fue cerrada — vuelve a iniciar sesión.')
     } else {
       setActionMsg(`Usuario "${data.full_name}" creado exitosamente.`)
       setTimeout(() => setActionMsg(null), 4000)
@@ -73,7 +68,7 @@ export default function UserManagementPanel() {
     return result
   }
 
-  const handleUpdate = async (userId: string, data: { full_name?: string; role?: 'admin' | 'developer' | 'viewer'; is_active?: boolean }) => {
+  const handleUpdate = async (userId: string, data: { full_name?: string; role?: RoleOption; is_active?: boolean }) => {
     await updateUser(userId, data)
     setActionMsg('Usuario actualizado correctamente.')
     setTimeout(() => setActionMsg(null), 3000)
@@ -106,6 +101,16 @@ export default function UserManagementPanel() {
     )
   }
 
+  // Filter buttons shown based on role
+  const filterOptions: { key: RoleFilter; label: string }[] = [
+    { key: 'all',       label: 'Todos' },
+    ...(isSuperAdmin ? [{ key: 'superadmin' as RoleFilter, label: 'Superadmin' }] : []),
+    { key: 'admin',     label: 'Admin' },
+    { key: 'developer', label: 'Developer' },
+    { key: 'viewer',    label: 'Viewer' },
+    { key: 'inactive',  label: '🔒 Inactivos' },
+  ]
+
   return (
     <div className="space-y-5">
       {/* Mensaje de acción */}
@@ -117,14 +122,15 @@ export default function UserManagementPanel() {
       )}
 
       {/* Stats cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
         {[
-          { label: 'Total Activos', value: stats.total,     color: 'border-blue-500',   icon: '👥' },
-          { label: 'Admins',        value: stats.admin,     color: 'border-red-500',    icon: '🔑' },
-          { label: 'Developers',    value: stats.developer, color: 'border-blue-400',   icon: '💻' },
-          { label: 'Viewers',       value: stats.viewer,    color: 'border-gray-400',   icon: '👁️' },
-          { label: 'Inactivos',     value: stats.inactive,  color: 'border-orange-400', icon: '🔒' },
-        ].map(s => (
+          { label: 'Total Activos', value: stats.total,      color: 'border-blue-500',    icon: '👥', show: true },
+          { label: 'Superadmins',   value: stats.superadmin, color: 'border-yellow-500',  icon: '⭐', show: isSuperAdmin },
+          { label: 'Admins',        value: stats.admin,      color: 'border-red-500',     icon: '🔑', show: true },
+          { label: 'Developers',    value: stats.developer,  color: 'border-blue-400',    icon: '💻', show: true },
+          { label: 'Viewers',       value: stats.viewer,     color: 'border-gray-400',    icon: '👁️', show: true },
+          { label: 'Inactivos',     value: stats.inactive,   color: 'border-orange-400',  icon: '🔒', show: true },
+        ].filter(s => s.show).map(s => (
           <div key={s.label} className={`bg-white rounded-xl border-l-4 ${s.color} p-4 shadow-sm flex items-center gap-3`}>
             <span className="text-2xl">{s.icon}</span>
             <div>
@@ -138,24 +144,22 @@ export default function UserManagementPanel() {
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Filtros */}
-          {(['all', 'admin', 'developer', 'viewer', 'inactive'] as RoleFilter[]).map(f => (
+          {filterOptions.map(f => (
             <button
-              key={f}
-              onClick={() => setFilter(f)}
+              key={f.key}
+              onClick={() => setFilter(f.key)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                filter === f
+                filter === f.key
                   ? 'bg-primary text-white shadow-sm'
                   : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
               }`}
             >
-              {f === 'all' ? 'Todos' : f === 'inactive' ? '🔒 Inactivos' : ROLE_LABEL[f]}
+              {f.label}
             </button>
           ))}
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Búsqueda */}
           <input
             type="text"
             value={search}
@@ -163,7 +167,6 @@ export default function UserManagementPanel() {
             placeholder="Buscar nombre o email..."
             className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary w-52"
           />
-          {/* Nuevo usuario */}
           <button
             onClick={() => { setEditing(null); setShowModal(true) }}
             className="px-4 py-1.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition flex items-center gap-1.5 shadow-sm"
@@ -193,66 +196,74 @@ export default function UserManagementPanel() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.map(u => (
-                <tr key={u.id} className={`hover:bg-gray-50 transition ${u.is_active === false ? 'opacity-60' : ''}`}>
-                  {/* Avatar + Nombre */}
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-full ${getAvatarColor(u.full_name)} flex items-center justify-center text-white text-sm font-bold shrink-0`}>
-                        {getInitials(u.full_name)}
+              {filtered.map(u => {
+                // Admins cannot edit superadmin users (shouldn't appear, but guard anyway)
+                const canEdit = isSuperAdmin || u.role !== 'superadmin'
+                return (
+                  <tr key={u.id} className={`hover:bg-gray-50 transition ${u.is_active === false ? 'opacity-60' : ''}`}>
+                    {/* Avatar + Nombre */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-9 h-9 rounded-full ${getAvatarColor(u.full_name)} flex items-center justify-center text-white text-sm font-bold shrink-0`}>
+                          {getInitials(u.full_name)}
+                        </div>
+                        <span className="font-medium text-gray-900 text-sm">{u.full_name}</span>
                       </div>
-                      <span className="font-medium text-gray-900 text-sm">{u.full_name}</span>
-                    </div>
-                  </td>
-                  {/* Email */}
-                  <td className="px-4 py-3 text-sm text-gray-600">{u.email}</td>
-                  {/* Rol */}
-                  <td className="px-4 py-3">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${ROLE_BADGE[u.role] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {ROLE_LABEL[u.role] ?? u.role}
-                    </span>
-                  </td>
-                  {/* Estado */}
-                  <td className="px-4 py-3">
-                    {u.is_active !== false ? (
-                      <span className="flex items-center gap-1.5 text-xs text-green-700 font-medium">
-                        <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                        Activo
+                    </td>
+                    {/* Email */}
+                    <td className="px-4 py-3 text-sm text-gray-600">{u.email}</td>
+                    {/* Rol */}
+                    <td className="px-4 py-3">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${ROLE_BADGE[u.role] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {ROLE_LABEL[u.role] ?? u.role}
                       </span>
-                    ) : (
-                      <span className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-                        <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />
-                        Inactivo
-                      </span>
-                    )}
-                  </td>
-                  {/* Creado */}
-                  <td className="px-4 py-3 text-xs text-gray-500">
-                    {new Date(u.created_at).toLocaleDateString('es-PE')}
-                  </td>
-                  {/* Acciones */}
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => { setEditing(u); setShowModal(true) }}
-                        className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 transition"
-                      >
-                        ✏️ Editar
-                      </button>
-                      <button
-                        onClick={() => handleToggleActive(u)}
-                        className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
-                          u.is_active !== false
-                            ? 'bg-orange-50 text-orange-700 hover:bg-orange-100'
-                            : 'bg-green-50 text-green-700 hover:bg-green-100'
-                        }`}
-                      >
-                        {u.is_active !== false ? '🔒 Desactivar' : '✅ Activar'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    {/* Estado */}
+                    <td className="px-4 py-3">
+                      {u.is_active !== false ? (
+                        <span className="flex items-center gap-1.5 text-xs text-green-700 font-medium">
+                          <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                          Activo
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+                          <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />
+                          Inactivo
+                        </span>
+                      )}
+                    </td>
+                    {/* Creado */}
+                    <td className="px-4 py-3 text-xs text-gray-500">
+                      {new Date(u.created_at).toLocaleDateString('es-PE')}
+                    </td>
+                    {/* Acciones */}
+                    <td className="px-4 py-3">
+                      {canEdit ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => { setEditing(u); setShowModal(true) }}
+                            className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 transition"
+                          >
+                            ✏️ Editar
+                          </button>
+                          <button
+                            onClick={() => handleToggleActive(u)}
+                            className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
+                              u.is_active !== false
+                                ? 'bg-orange-50 text-orange-700 hover:bg-orange-100'
+                                : 'bg-green-50 text-green-700 hover:bg-green-100'
+                            }`}
+                          >
+                            {u.is_active !== false ? '🔒 Desactivar' : '✅ Activar'}
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 text-right">🔒 Solo Superadmin</p>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}
@@ -266,6 +277,7 @@ export default function UserManagementPanel() {
       {showModal && (
         <UserModal
           user={editing ?? undefined}
+          currentUserRole={currentUserRole}
           onClose={() => { setShowModal(false); setEditing(null) }}
           onCreate={handleCreate}
           onUpdate={handleUpdate}

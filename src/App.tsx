@@ -42,7 +42,8 @@ function Dashboard() {
   const [currentTab, setCurrentTab]   = useState<'dashboard' | 'boards' | 'requests' | 'equipo'>('dashboard')
   const [adminSubTab, setAdminSubTab] = useState<'usuarios' | 'carga' | 'papelera'>('carga')
   const [openProjectId, setOpenProjectId] = useState<string | null>(null)
-  const pendingCount = usePendingCount(user?.role === 'admin')
+  const isAdminOrSuperAdmin = user?.role === 'admin' || user?.role === 'superadmin'
+  const pendingCount = usePendingCount(isAdminOrSuperAdmin)
   useSlaWarnings()
 
   return (
@@ -93,7 +94,7 @@ function Dashboard() {
                     </span>
                   )}
                 </button>
-                {user?.role === 'admin' && (
+                {isAdminOrSuperAdmin && (
                   <button
                     onClick={() => setCurrentTab('equipo')}
                     className={`px-4 py-2 rounded-md font-medium text-sm transition ${
@@ -117,7 +118,7 @@ function Dashboard() {
               
               {/* Reloj + Campana */}
               <div className="flex items-center gap-2">
-                {user?.role === 'admin' && <AdminClock />}
+                {isAdminOrSuperAdmin && <AdminClock />}
                 <NotificationBell onProjectClick={(projectId) => {
                   setCurrentTab('boards')
                   setOpenProjectId(projectId)
@@ -168,7 +169,7 @@ function Dashboard() {
           </>
         )}
 
-        {currentTab === 'equipo' && user?.role === 'admin' && (
+        {currentTab === 'equipo' && isAdminOrSuperAdmin && (
           <>
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900">👥 Equipo</h2>
