@@ -4,6 +4,7 @@ import { useUsers } from '../../hooks/useUsers'
 import type { Request } from '../../types/database.types'
 import { calcSlaFormalDays, calcTargetDate } from '../../lib/sla-config'
 import { toast } from '../../lib/toast'
+import PlannerImportModal from './PlannerImportModal'
 
 const isUrgent = (r: Request) => !!r.observations?.startsWith('🔴 URGENTE')
 
@@ -41,6 +42,7 @@ export default function RequestInbox() {
   const [showApproveModal, setShowApproveModal] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [sameUser, setSameUser] = useState(false)
   const [approveData, setApproveData] = useState({
     project_type: 'development' as 'development' | 'administrative' | 'dual',
@@ -129,6 +131,16 @@ export default function RequestInbox() {
 
   return (
     <div className="space-y-6">
+      {/* Import button */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowImportModal(true)}
+          className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition flex items-center gap-2 shadow-sm"
+        >
+          📥 Importar Planner
+        </button>
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-2 border-b">
         {([
@@ -460,6 +472,11 @@ export default function RequestInbox() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Planner Import Modal */}
+      {showImportModal && (
+        <PlannerImportModal onClose={() => { setShowImportModal(false) }} />
       )}
 
       {/* Approve Modal */}
