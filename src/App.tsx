@@ -43,6 +43,7 @@ function Dashboard() {
   const [adminSubTab, setAdminSubTab] = useState<'usuarios' | 'carga' | 'papelera'>('carga')
   const [openProjectId, setOpenProjectId] = useState<string | null>(null)
   const isAdminOrSuperAdmin = user?.role === 'admin' || user?.role === 'superadmin'
+  const canSeeEquipo = isAdminOrSuperAdmin || user?.role === 'developer'
   const pendingCount = usePendingCount(isAdminOrSuperAdmin)
   useSlaWarnings()
 
@@ -94,7 +95,7 @@ function Dashboard() {
                     </span>
                   )}
                 </button>
-                {isAdminOrSuperAdmin && (
+                {canSeeEquipo && (
                   <button
                     onClick={() => setCurrentTab('equipo')}
                     className={`px-4 py-2 rounded-md font-medium text-sm transition ${
@@ -118,7 +119,7 @@ function Dashboard() {
               
               {/* Reloj + Campana */}
               <div className="flex items-center gap-2">
-                {isAdminOrSuperAdmin && <AdminClock />}
+                {canSeeEquipo && <AdminClock />}
                 <NotificationBell onProjectClick={(projectId) => {
                   setCurrentTab('boards')
                   setOpenProjectId(projectId)
@@ -169,7 +170,7 @@ function Dashboard() {
           </>
         )}
 
-        {currentTab === 'equipo' && isAdminOrSuperAdmin && (
+        {currentTab === 'equipo' && canSeeEquipo && (
           <>
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900">👥 Equipo</h2>
@@ -190,27 +191,31 @@ function Dashboard() {
               >
                 📊 Carga de Trabajo
               </button>
-              <button
-                onClick={() => setAdminSubTab('usuarios')}
-                className={`px-4 py-2 rounded-md font-medium text-sm transition ${
-                  adminSubTab === 'usuarios'
-                    ? 'bg-white text-primary shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                🔑 Usuarios
-              </button>
+              {isAdminOrSuperAdmin && (
+                <button
+                  onClick={() => setAdminSubTab('usuarios')}
+                  className={`px-4 py-2 rounded-md font-medium text-sm transition ${
+                    adminSubTab === 'usuarios'
+                      ? 'bg-white text-primary shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  🔑 Usuarios
+                </button>
+              )}
 
-              <button
-                onClick={() => setAdminSubTab('papelera')}
-                className={`px-4 py-2 rounded-md font-medium text-sm transition ${
-                  adminSubTab === 'papelera'
-                    ? 'bg-white text-primary shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                🗑 Papelera
-              </button>
+              {isAdminOrSuperAdmin && (
+                <button
+                  onClick={() => setAdminSubTab('papelera')}
+                  className={`px-4 py-2 rounded-md font-medium text-sm transition ${
+                    adminSubTab === 'papelera'
+                      ? 'bg-white text-primary shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  🗑 Papelera
+                </button>
+              )}
             </div>
 
             {adminSubTab === 'carga'    && <WorkloadView />}

@@ -69,6 +69,9 @@ export default function KanbanBoard({ boardType, openProjectId, onOpenHandled }:
   const { projects, loading, hasMore, loadMore, statusFilter, setStatusFilter, updateProjectFlow, updateProject, updateFlowDetails, createProject, deleteProject, reload, bulkUpdateProjects } = useProjects()
   const { activeUsers } = useUsers()
   const { user: currentUser } = useAuth()
+  const role = currentUser?.role ?? 'viewer'
+  const canEdit    = role === 'superadmin' || role === 'admin' || role === 'developer'
+  const canManage  = role === 'superadmin' || role === 'admin'
   const [selectedProject, setSelectedProject] = useState<{ project: any; flow: ProjectFlow } | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -142,6 +145,7 @@ export default function KanbanBoard({ boardType, openProjectId, onOpenHandled }:
   }
 
   const handleDragEnd = async (result: DropResult) => {
+    if (!canEdit) return
     const { destination, draggableId } = result
     if (!destination) return
     try {
@@ -301,12 +305,14 @@ export default function KanbanBoard({ boardType, openProjectId, onOpenHandled }:
         )}
 
         {/* Nuevo proyecto + View mode toggle (derecha) */}
-        <button
-          onClick={() => setShowNewModal(true)}
-          className="ml-auto px-3 py-1.5 rounded-lg text-sm font-semibold bg-primary text-white hover:bg-primary/90 transition flex items-center gap-1.5"
-        >
-          <span className="text-base leading-none">+</span> Nuevo Proyecto
-        </button>
+        {canManage && (
+          <button
+            onClick={() => setShowNewModal(true)}
+            className="ml-auto px-3 py-1.5 rounded-lg text-sm font-semibold bg-primary text-white hover:bg-primary/90 transition flex items-center gap-1.5"
+          >
+            <span className="text-base leading-none">+</span> Nuevo Proyecto
+          </button>
+        )}
         <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
           {VIEW_MODES.map(vm => (
             <button
@@ -380,8 +386,8 @@ export default function KanbanBoard({ boardType, openProjectId, onOpenHandled }:
                 onProjectClick={setSelectedProject}
                 users={activeUsers}
                 onAssign={(flowId, userId) => updateFlowDetails(flowId, { assigned_to: userId }).then(reload)}
-                selectedIds={selectedIds}
-                onSelect={id => setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+                selectedIds={canEdit ? selectedIds : []}
+                onSelect={canEdit ? (id => setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])) : undefined}
               />
             ))}
           </div>
@@ -411,7 +417,7 @@ export default function KanbanBoard({ boardType, openProjectId, onOpenHandled }:
       )}
 
       {/* ── BULK ACTION BAR ── */}
-      {selectedIds.length > 0 && (
+      {canEdit && selectedIds.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white border border-gray-200 shadow-2xl rounded-2xl px-5 py-3 flex items-center gap-4 min-w-max">
           <span className="text-sm font-semibold text-gray-700">
             {selectedIds.length} seleccionado{selectedIds.length !== 1 ? 's' : ''}

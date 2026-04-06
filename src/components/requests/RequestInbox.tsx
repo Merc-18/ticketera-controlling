@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useRequests } from '../../hooks/useRequests'
 import { useUsers } from '../../hooks/useUsers'
+import { useAuth } from '../../hooks/useAuth'
 import type { Request } from '../../types/database.types'
 import { calcSlaFormalDays, calcTargetDate } from '../../lib/sla-config'
 import { toast } from '../../lib/toast'
@@ -36,6 +37,8 @@ type InboxTab = 'pending' | 'approved' | 'rejected'
 export default function RequestInbox() {
   const { requests, loading, approveRequest, rejectRequest } = useRequests()
   const { activeUsers } = useUsers()
+  const { user: currentUser } = useAuth()
+  const canManage = currentUser?.role === 'superadmin' || currentUser?.role === 'admin'
   const [activeTab, setActiveTab] = useState<InboxTab>('pending')
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null)
   const [showRejectModal, setShowRejectModal] = useState(false)
@@ -132,14 +135,16 @@ export default function RequestInbox() {
   return (
     <div className="space-y-6">
       {/* Import button */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => setShowImportModal(true)}
-          className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition flex items-center gap-2 shadow-sm"
-        >
-          📥 Importar Planner
-        </button>
-      </div>
+      {canManage && (
+        <div className="flex justify-end">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition flex items-center gap-2 shadow-sm"
+          >
+            📥 Importar Planner
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2 border-b">
@@ -205,22 +210,24 @@ export default function RequestInbox() {
                   </div>
                   <div className="mb-2"><TypeChips request={request} /></div>
                   <p className="text-sm text-gray-600 line-clamp-2">{request.description}</p>
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); openApproveModal(request) }}
-                      disabled={actionLoading}
-                      className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition disabled:opacity-50"
-                    >
-                      ✓ Aprobar
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setSelectedRequest(request); setShowRejectModal(true) }}
-                      disabled={actionLoading}
-                      className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition disabled:opacity-50"
-                    >
-                      ✕ Rechazar
-                    </button>
-                  </div>
+                  {canManage && (
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openApproveModal(request) }}
+                        disabled={actionLoading}
+                        className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition disabled:opacity-50"
+                      >
+                        ✓ Aprobar
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSelectedRequest(request); setShowRejectModal(true) }}
+                        disabled={actionLoading}
+                        className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition disabled:opacity-50"
+                      >
+                        ✕ Rechazar
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             })
@@ -413,7 +420,7 @@ export default function RequestInbox() {
               )}
             </div>
 
-            {selectedRequest.status === 'pending' && (
+            {selectedRequest.status === 'pending' && canManage && (
               <div className="mt-6 flex gap-3">
                 <button
                   onClick={() => openApproveModal(selectedRequest)}
