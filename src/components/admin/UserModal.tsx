@@ -13,8 +13,8 @@ interface Props {
 
 const ALL_ROLES: { value: RoleOption; label: string; desc: string; color: string }[] = [
   { value: 'superadmin', label: 'Superadmin', desc: 'Control total del sistema, único que puede gestionar admins', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-  { value: 'admin',      label: 'Admin',      desc: 'Gestión de proyectos, solicitudes y usuarios developer/viewer', color: 'bg-red-100 text-red-800 border-red-200' },
-  { value: 'developer',  label: 'Developer',  desc: 'Gestión de proyectos, actualizar fases y progreso',            color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { value: 'admin',      label: 'Admin',      desc: 'Gestión de proyectos, solicitudes y usuarios',                 color: 'bg-red-100 text-red-800 border-red-200' },
+  { value: 'developer',  label: 'Usuario',    desc: 'Gestión de proyectos, actualizar fases y progreso',            color: 'bg-blue-100 text-blue-800 border-blue-200' },
   { value: 'viewer',     label: 'Viewer',     desc: 'Solo lectura: puede ver proyectos y dashboard',                color: 'bg-gray-100 text-gray-700 border-gray-200' },
 ]
 

@@ -18,7 +18,7 @@ const ROLE_BADGE: Record<string, string> = {
 const ROLE_LABEL: Record<string, string> = {
   superadmin: 'Superadmin',
   admin:      'Admin',
-  developer:  'Developer',
+  developer:  'Usuario',
   viewer:     'Viewer',
 }
 
@@ -106,7 +106,7 @@ export default function UserManagementPanel() {
     { key: 'all',       label: 'Todos' },
     ...(isSuperAdmin ? [{ key: 'superadmin' as RoleFilter, label: 'Superadmin' }] : []),
     { key: 'admin',     label: 'Admin' },
-    { key: 'developer', label: 'Developer' },
+    { key: 'developer', label: 'Usuario' },
     { key: 'viewer',    label: 'Viewer' },
     { key: 'inactive',  label: '🔒 Inactivos' },
   ]
@@ -127,7 +127,7 @@ export default function UserManagementPanel() {
           { label: 'Total Activos', value: stats.total,      color: 'border-blue-500',    icon: '👥', show: true },
           { label: 'Superadmins',   value: stats.superadmin, color: 'border-yellow-500',  icon: '⭐', show: isSuperAdmin },
           { label: 'Admins',        value: stats.admin,      color: 'border-red-500',     icon: '🔑', show: true },
-          { label: 'Developers',    value: stats.developer,  color: 'border-blue-400',    icon: '💻', show: true },
+          { label: 'Usuarios',      value: stats.developer,  color: 'border-blue-400',    icon: '💻', show: true },
           { label: 'Viewers',       value: stats.viewer,     color: 'border-gray-400',    icon: '👁️', show: true },
           { label: 'Inactivos',     value: stats.inactive,   color: 'border-orange-400',  icon: '🔒', show: true },
         ].filter(s => s.show).map(s => (
