@@ -23,7 +23,7 @@ const ROLE_LABEL: Record<string, string> = {
 }
 
 export default function UserManagementPanel() {
-  const { users, loading, error, reload, createUser, updateUser } = useUsers()
+  const { users, loading, error, reload, createUser, updateUser, deleteUser } = useUsers()
   const { user: currentUser } = useAuth()
   const currentUserRole = (currentUser?.role ?? 'viewer') as RoleOption
   const isSuperAdmin = currentUserRole === 'superadmin'
@@ -33,6 +33,7 @@ export default function UserManagementPanel() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing]     = useState<User | null>(null)
   const [actionMsg, setActionMsg] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<User | null>(null)
 
   // Admins cannot see superadmin users
   const visibleUsers = isSuperAdmin
@@ -71,6 +72,13 @@ export default function UserManagementPanel() {
   const handleUpdate = async (userId: string, data: { full_name?: string; role?: RoleOption; is_active?: boolean }) => {
     await updateUser(userId, data)
     setActionMsg('Usuario actualizado correctamente.')
+    setTimeout(() => setActionMsg(null), 3000)
+  }
+
+  const handleDelete = async (u: User) => {
+    await deleteUser(u.id)
+    setConfirmDelete(null)
+    setActionMsg(`Usuario "${u.full_name}" eliminado.`)
     setTimeout(() => setActionMsg(null), 3000)
   }
 
@@ -256,6 +264,14 @@ export default function UserManagementPanel() {
                           >
                             {u.is_active !== false ? '🔒 Desactivar' : '✅ Activar'}
                           </button>
+                          {isSuperAdmin && (
+                            <button
+                              onClick={() => setConfirmDelete(u)}
+                              className="px-3 py-1 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 transition"
+                            >
+                              🗑 Eliminar
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <p className="text-xs text-gray-400 text-right">🔒 Solo Superadmin</p>
@@ -272,6 +288,35 @@ export default function UserManagementPanel() {
       <p className="text-xs text-gray-400 text-right">
         {filtered.length} usuario{filtered.length !== 1 ? 's' : ''} mostrado{filtered.length !== 1 ? 's' : ''}
       </p>
+
+      {/* Confirm Delete Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">🗑 Eliminar usuario</h3>
+            <p className="text-gray-600 text-sm mb-1">
+              ¿Estás seguro que deseas eliminar a <strong>{confirmDelete.full_name}</strong>?
+            </p>
+            <p className="text-red-600 text-xs mb-5">
+              Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleDelete(confirmDelete)}
+                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {showModal && (

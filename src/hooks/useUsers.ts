@@ -110,6 +110,15 @@ export function useUsers() {
     await loadUsers()
   }
 
+  const deleteUser = async (userId: string) => {
+    const { error } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', userId)
+    if (error) throw error
+    await loadUsers()
+  }
+
   const activeUsers = users.filter(u => u.is_active !== false)
 
   return {
@@ -120,5 +129,6 @@ export function useUsers() {
     reload: loadUsers,
     createUser,
     updateUser,
+    deleteUser,
   }
 }

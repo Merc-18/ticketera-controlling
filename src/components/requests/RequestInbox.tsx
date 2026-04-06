@@ -32,14 +32,11 @@ function TypeChips({ request }: { request: Request }) {
   )
 }
 
-type InboxTab = 'pending' | 'approved' | 'rejected'
-
 export default function RequestInbox() {
   const { requests, loading, approveRequest, rejectRequest } = useRequests()
   const { activeUsers } = useUsers()
   const { user: currentUser } = useAuth()
   const canManage = currentUser?.role === 'superadmin' || currentUser?.role === 'admin'
-  const [activeTab, setActiveTab] = useState<InboxTab>('pending')
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null)
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [showApproveModal, setShowApproveModal] = useState(false)
@@ -58,8 +55,6 @@ export default function RequestInbox() {
   })
 
   const pendingRequests = requests.filter(r => r.status === 'pending')
-  const approvedRequests = requests.filter(r => r.status === 'approved')
-  const rejectedRequests = requests.filter(r => r.status === 'rejected')
 
   const openApproveModal = (request: Request) => {
     const urgent = isUrgent(request)
@@ -117,8 +112,6 @@ export default function RequestInbox() {
 
   const statusColors = {
     pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    approved: 'bg-green-100 text-green-800 border-green-200',
-    rejected: 'bg-red-100 text-red-800 border-red-200'
   }
 
   if (loading) {
@@ -146,183 +139,71 @@ export default function RequestInbox() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-2 border-b">
-        {([
-          { key: 'pending',  label: 'Pendientes',  count: pendingRequests.length,  dot: 'bg-yellow-400' },
-          { key: 'approved', label: 'Aprobadas',   count: approvedRequests.length, dot: 'bg-green-500' },
-          { key: 'rejected', label: 'Rechazadas',  count: rejectedRequests.length, dot: 'bg-red-500' },
-        ] as const).map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition flex items-center gap-2 ${
-              activeTab === tab.key
-                ? 'border-primary text-primary'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <span className={`w-2 h-2 rounded-full ${tab.dot}`} />
-            {tab.label}
-            <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
-              activeTab === tab.key ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500'
-            }`}>
-              {tab.count}
-            </span>
-          </button>
-        ))}
+      {/* Header contador */}
+      <div className="flex items-center gap-2 pb-3 border-b">
+        <span className="w-2 h-2 rounded-full bg-yellow-400" />
+        <span className="text-sm font-medium text-gray-700">Solicitudes Pendientes</span>
+        <span className="text-xs px-1.5 py-0.5 rounded-full font-bold bg-primary text-white">
+          {pendingRequests.length}
+        </span>
       </div>
 
       {/* Request List */}
       <div className="grid gap-4">
-        {/* ── Pendientes ── */}
-        {activeTab === 'pending' && (
-          pendingRequests.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <p className="text-4xl mb-3">🎉</p>
-              <p className="text-gray-500 font-medium">No hay solicitudes pendientes</p>
-            </div>
-          ) : (
-            pendingRequests.map(request => {
-              const urgent = isUrgent(request)
-              return (
-                <div
-                  key={request.id}
-                  className={`bg-white border rounded-lg p-4 hover:shadow-md transition cursor-pointer ${urgent ? 'border-red-300' : ''}`}
-                  onClick={() => setSelectedRequest(request)}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <p className="font-mono font-bold text-primary">{request.request_number}</p>
-                        {urgent && (
-                          <span className="px-2 py-0.5 bg-red-100 text-red-700 border border-red-200 rounded-full text-xs font-bold">
-                            🔴 URGENTE
-                          </span>
-                        )}
-                      </div>
-                      <p className="font-semibold text-gray-900">{request.requester_name}</p>
-                      <p className="text-sm text-gray-600">{request.requester_area}</p>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium border ${statusColors[request.status]}`}>
-                      Pendiente
-                    </span>
-                  </div>
-                  <div className="mb-2"><TypeChips request={request} /></div>
-                  <p className="text-sm text-gray-600 line-clamp-2">{request.description}</p>
-                  {canManage && (
-                    <div className="mt-3 flex gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openApproveModal(request) }}
-                        disabled={actionLoading}
-                        className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition disabled:opacity-50"
-                      >
-                        ✓ Aprobar
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setSelectedRequest(request); setShowRejectModal(true) }}
-                        disabled={actionLoading}
-                        className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition disabled:opacity-50"
-                      >
-                        ✕ Rechazar
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )
-            })
-          )
-        )}
-
-        {/* ── Aprobadas ── */}
-        {activeTab === 'approved' && (
-          approvedRequests.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <p className="text-gray-500">No hay solicitudes aprobadas</p>
-            </div>
-          ) : (
-            approvedRequests.map(request => {
-              const urgent = isUrgent(request)
-              const projectDeleted = (request as any).projects?.status === 'deleted'
-              return (
-                <div
-                  key={request.id}
-                  className={`bg-white border rounded-lg p-4 hover:shadow-md transition cursor-pointer ${projectDeleted ? 'border-gray-200 opacity-75' : 'border-green-100'}`}
-                  onClick={() => setSelectedRequest(request)}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <p className="font-mono font-bold text-primary">{request.request_number}</p>
-                        {urgent && (
-                          <span className="px-2 py-0.5 bg-red-100 text-red-700 border border-red-200 rounded-full text-xs font-bold">
-                            🔴 URGENTE
-                          </span>
-                        )}
-                        {projectDeleted && (
-                          <span className="px-2 py-0.5 bg-gray-100 text-gray-500 border border-gray-200 rounded-full text-xs font-medium">
-                            🗑 Proyecto eliminado
-                          </span>
-                        )}
-                      </div>
-                      <p className="font-semibold text-gray-900">{request.requester_name}</p>
-                      <p className="text-sm text-gray-600">{request.requester_area}</p>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium border ${statusColors.approved}`}>
-                      ✅ Aprobado
-                    </span>
-                  </div>
-                  <div className="mb-2"><TypeChips request={request} /></div>
-                  <p className="text-sm text-gray-600 line-clamp-2">{request.description}</p>
-                  <p className="text-xs text-gray-400 mt-2">
-                    Recibido: {new Date(request.created_at).toLocaleDateString('es-PE')}
-                    {request.requested_date && (
-                      <span> · SLA: {new Date(request.requested_date + 'T12:00:00').toLocaleDateString('es-PE')}</span>
-                    )}
-                  </p>
-                </div>
-              )
-            })
-          )
-        )}
-
-        {/* ── Rechazadas ── */}
-        {activeTab === 'rejected' && (
-          rejectedRequests.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <p className="text-gray-500">No hay solicitudes rechazadas</p>
-            </div>
-          ) : (
-            rejectedRequests.map(request => (
+        {pendingRequests.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <p className="text-4xl mb-3">🎉</p>
+            <p className="text-gray-500 font-medium">No hay solicitudes pendientes</p>
+          </div>
+        ) : (
+          pendingRequests.map(request => {
+            const urgent = isUrgent(request)
+            return (
               <div
                 key={request.id}
-                className="bg-white border border-red-100 rounded-lg p-4 hover:shadow-md transition cursor-pointer"
+                className={`bg-white border rounded-lg p-4 hover:shadow-md transition cursor-pointer ${urgent ? 'border-red-300' : ''}`}
                 onClick={() => setSelectedRequest(request)}
               >
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <p className="font-mono font-bold text-primary">{request.request_number}</p>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="font-mono font-bold text-primary">{request.request_number}</p>
+                      {urgent && (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-700 border border-red-200 rounded-full text-xs font-bold">
+                          🔴 URGENTE
+                        </span>
+                      )}
+                    </div>
                     <p className="font-semibold text-gray-900">{request.requester_name}</p>
                     <p className="text-sm text-gray-600">{request.requester_area}</p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium border ${statusColors.rejected}`}>
-                    ❌ Rechazado
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium border ${statusColors.pending}`}>
+                    Pendiente
                   </span>
                 </div>
                 <div className="mb-2"><TypeChips request={request} /></div>
                 <p className="text-sm text-gray-600 line-clamp-2">{request.description}</p>
-                {request.rejection_reason && (
-                  <div className="mt-2 bg-red-50 border border-red-100 rounded px-3 py-2">
-                    <p className="text-xs text-red-600 font-medium mb-0.5">Razón del rechazo:</p>
-                    <p className="text-xs text-red-800 line-clamp-2">{request.rejection_reason}</p>
+                {canManage && (
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openApproveModal(request) }}
+                      disabled={actionLoading}
+                      className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition disabled:opacity-50"
+                    >
+                      ✓ Aprobar
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSelectedRequest(request); setShowRejectModal(true) }}
+                      disabled={actionLoading}
+                      className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition disabled:opacity-50"
+                    >
+                      ✕ Rechazar
+                    </button>
                   </div>
                 )}
-                <p className="text-xs text-gray-400 mt-2">
-                  Recibido: {new Date(request.created_at).toLocaleDateString('es-PE')}
-                </p>
               </div>
-            ))
-          )
+            )
+          })
         )}
       </div>
 
@@ -350,7 +231,7 @@ export default function RequestInbox() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Estado</p>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium border ${statusColors[selectedRequest.status]}`}>
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium border ${statusColors.pending}`}>
                     {selectedRequest.status === 'pending' && 'Pendiente'}
                     {selectedRequest.status === 'approved' && 'Aprobado'}
                     {selectedRequest.status === 'rejected' && 'Rechazado'}
