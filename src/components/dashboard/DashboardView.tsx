@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useDashboardData, type DashboardStats } from '../../hooks/useDashboardData'
 import { toast } from '../../lib/toast'
+import { AREAS } from '../../lib/constants'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -216,19 +217,24 @@ function MonthlyChart({ data }: { data: DashboardStats['completedByMonth'] }) {
 
 // ── Main component ───────────────────────────────────────────────────────────
 
-const AREAS = ['AASS', 'ATC', 'DDC', 'QA', 'SAQ']
-
 const PERIOD_OPTIONS = [
   { value: 30,   label: 'Últimos 30d' },
   { value: 90,   label: 'Últimos 90d' },
   { value: null, label: 'Todo el tiempo' },
 ] as const
 
+const TYPE_VIEW_OPTIONS = [
+  { value: null,             label: '🌐 Global' },
+  { value: 'development',    label: '💻 Development' },
+  { value: 'administrative', label: '📋 Administrative' },
+] as const
+
 export default function DashboardView() {
   const [period, setPeriod] = useState<number | null>(null)
   const [areaFilter, setAreaFilter] = useState<string | null>(null)
+  const [typeFilter, setTypeFilter] = useState<string | null>(null)
   const [exporting, setExporting] = useState<'completed' | 'active' | null>(null)
-  const { stats, loading, reload } = useDashboardData(period, areaFilter)
+  const { stats, loading, reload } = useDashboardData(period, areaFilter, typeFilter)
 
   const handleExportCompleted = async () => {
     setExporting('completed')
@@ -284,7 +290,9 @@ export default function DashboardView() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">📈 Dashboard</h2>
-          <p className="text-sm text-gray-500 mt-1">Resumen general de todos los proyectos</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {typeFilter === 'development' ? 'Vista: solo proyectos de Development' : typeFilter === 'administrative' ? 'Vista: solo proyectos Administrativos' : 'Vista global — todos los proyectos'}
+          </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Filtro de período */}
@@ -295,6 +303,23 @@ export default function DashboardView() {
                 onClick={() => setPeriod(opt.value)}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
                   period === opt.value
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Filtro por tipo (vista) */}
+          <div className="flex items-center bg-gray-100 rounded-lg p-1 gap-1">
+            {TYPE_VIEW_OPTIONS.map(opt => (
+              <button
+                key={String(opt.value)}
+                onClick={() => setTypeFilter(opt.value)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
+                  typeFilter === opt.value
                     ? 'bg-white text-gray-900 shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}

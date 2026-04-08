@@ -302,6 +302,8 @@ export function useProjects() {
     priority: 'low' | 'medium' | 'high' | 'urgent'
     start_date?: string
     due_date?: string
+    area?: string
+    requester_name?: string
   }) => {
     try {
         // Generate next INT{YY}-XXX number (resets each year)
@@ -347,6 +349,32 @@ export function useProjects() {
 
       const { error: flowsError } = await supabase.from('project_flows').insert(flows)
       if (flowsError) throw flowsError
+
+      // If an area (or requester name) was provided, create a stub request and link it
+      if (projectData.area) {
+        const { data: stubRequest } = await supabase
+          .from('requests')
+          .insert([{
+            request_number: projectNumber,
+            requester_name: projectData.requester_name?.trim() || '—',
+            requester_area: projectData.area,
+            request_type: 'INT',
+            origin: 'Interno',
+            description: projectData.description.trim(),
+            needs_code: false,
+            status: 'approved',
+            project_id: project.id,
+          }])
+          .select()
+          .single()
+
+        if (stubRequest) {
+          await supabase
+            .from('projects')
+            .update({ request_id: stubRequest.id })
+            .eq('id', project.id)
+        }
+      }
 
       await logActivity(project.id, 'created', { title: project.title })
       await loadProjects()

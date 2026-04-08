@@ -40,11 +40,14 @@ export const PRIORITY_DOT: Record<string, string> = {
 
 /** Area badge — includes border-color class */
 export const AREA_COLORS: Record<string, string> = {
-  SAQ:  'bg-blue-100 text-blue-800 border-blue-200',
-  DDC:  'bg-purple-100 text-purple-800 border-purple-200',
-  QA:   'bg-teal-100 text-teal-800 border-teal-200',
-  ATC:  'bg-orange-100 text-orange-800 border-orange-200',
-  AASS: 'bg-pink-100 text-pink-800 border-pink-200',
+  SAQ:         'bg-blue-100 text-blue-800 border-blue-200',
+  DDC:         'bg-purple-100 text-purple-800 border-purple-200',
+  QA:          'bg-teal-100 text-teal-800 border-teal-200',
+  ATC:         'bg-orange-100 text-orange-800 border-orange-200',
+  AASS:        'bg-pink-100 text-pink-800 border-pink-200',
+  PMO:         'bg-cyan-100 text-cyan-800 border-cyan-200',
+  OC:          'bg-lime-100 text-lime-800 border-lime-200',
+  Controlling: 'bg-violet-100 text-violet-800 border-violet-200',
 }
 
 export const PHASE_LABELS: Record<string, string> = {
@@ -61,4 +64,4 @@ export const PHASE_LABELS: Record<string, string> = {
   deployed:       'Deployed',
 }
 
-export const AREAS = ['AASS', 'ATC', 'DDC', 'QA', 'SAQ']
+export const AREAS = ['AASS', 'ATC', 'Controlling', 'DDC', 'OC', 'PMO', 'QA', 'SAQ']

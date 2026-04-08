@@ -5,7 +5,7 @@ import ChecklistSection from './ChecklistSection'
 import ActivitySection from './ActivitySection'
 import { useUsers } from '../../hooks/useUsers'
 import { supabase } from '../../lib/supabase'
-import { getAvatarColor, getInitials, AREA_COLORS, PHASE_LABELS } from '../../lib/constants'
+import { getAvatarColor, getInitials, AREA_COLORS, PHASE_LABELS, AREAS as ALL_AREAS } from '../../lib/constants'
 
 interface Props {
   project: Project & { requests?: { requester_area: string; requester_name: string; request_type: string } | null }
@@ -24,7 +24,7 @@ const PRIORITY_OPTIONS = [
   { value: 'urgent', label: 'Urgente', color: 'bg-red-100 text-red-800 border-red-200' },
 ]
 
-const KNOWN_AREAS = ['SAQ', 'DDC', 'QA', 'ATC', 'AASS']
+const KNOWN_AREAS = ALL_AREAS
 
 export default function ProjectModal({ project, flows, onClose, onUpdate, onDelete, updateProject, updateFlowDetails }: Props) {
   const { activeUsers } = useUsers()
@@ -105,6 +105,29 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, onDele
           .from('requests')
           .update({ requester_area: editData.requester_area })
           .eq('id', project.request_id)
+      } else if (!project.request_id && editData.requester_area) {
+        // No linked request yet — create a stub and link it
+        const { data: stubRequest } = await supabase
+          .from('requests')
+          .insert([{
+            request_number: project.project_number ?? project.id.slice(0, 8),
+            requester_name: project.requests?.requester_name || '—',
+            requester_area: editData.requester_area,
+            request_type: 'INT',
+            origin: 'Interno',
+            description: project.description,
+            needs_code: false,
+            status: 'approved',
+            project_id: project.id,
+          }])
+          .select()
+          .single()
+        if (stubRequest) {
+          await supabase
+            .from('projects')
+            .update({ request_id: stubRequest.id })
+            .eq('id', project.id)
+        }
       }
       setEditMode(false)
       onUpdate?.()

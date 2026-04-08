@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { AREAS } from '../../lib/constants'
 
 interface Props {
   boardType: 'development' | 'administrative'
@@ -10,6 +11,8 @@ interface Props {
     priority: 'low' | 'medium' | 'high' | 'urgent'
     start_date?: string
     due_date?: string
+    area?: string
+    requester_name?: string
   }) => Promise<void>
 }
 
@@ -33,6 +36,8 @@ export default function NewProjectModal({ boardType, onClose, onCreate }: Props)
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium')
   const [startDate, setStartDate] = useState('')
   const [dueDate, setDueDate] = useState('')
+  const [area, setArea] = useState('')
+  const [requesterName, setRequesterName] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -48,6 +53,8 @@ export default function NewProjectModal({ boardType, onClose, onCreate }: Props)
         priority,
         start_date: startDate || undefined,
         due_date: dueDate || undefined,
+        area: area || undefined,
+        requester_name: requesterName.trim() || undefined,
       })
       onClose()
     } catch (err: any) {
@@ -141,6 +148,33 @@ export default function NewProjectModal({ boardType, onClose, onCreate }: Props)
                 type="date"
                 value={dueDate}
                 onChange={e => setDueDate(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Área + Solicitante */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Área</label>
+              <select
+                value={area}
+                onChange={e => setArea(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="">— Sin área —</option>
+                {AREAS.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                Solicitante <span className="text-gray-400 font-normal">(opcional)</span>
+              </label>
+              <input
+                type="text"
+                value={requesterName}
+                onChange={e => setRequesterName(e.target.value)}
+                placeholder="Nombre de quien solicita..."
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
             </div>

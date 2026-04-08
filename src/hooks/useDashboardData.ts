@@ -20,23 +20,23 @@ export interface DashboardStats {
   completedByMonth: { month: string; total: number; onTime: number }[]
 }
 
-export function useDashboardData(periodDays: number | null = null, areaFilter: string | null = null) {
+export function useDashboardData(periodDays: number | null = null, areaFilter: string | null = null, typeFilter: string | null = null) {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { load() }, [periodDays, areaFilter])
+  useEffect(() => { load() }, [periodDays, areaFilter, typeFilter])
 
   // Refresh when the browser tab becomes visible again
   useEffect(() => {
     const onVisible = () => { if (document.visibilityState === 'visible') load() }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [periodDays, areaFilter])
+  }, [periodDays, areaFilter, typeFilter])
 
   // Realtime: refresh when projects or SLA logs change
   useEffect(() => {
     const channel = supabase
-      .channel(`dashboard-realtime-${String(periodDays)}-${String(areaFilter)}`)
+      .channel(`dashboard-realtime-${String(periodDays)}-${String(areaFilter)}-${String(typeFilter)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_logs' }, () => load())
       .subscribe()
@@ -66,9 +66,16 @@ export function useDashboardData(periodDays: number | null = null, areaFilter: s
       slaQuery,
     ])
 
-    const projects = areaFilter
+    let projects = areaFilter
       ? (rawProjects ?? []).filter(p => (p as any).requests?.requester_area === areaFilter)
       : (rawProjects ?? [])
+    if (typeFilter) {
+      if (typeFilter === 'development') {
+        projects = projects.filter(p => p.project_type === 'development' || p.project_type === 'dual')
+      } else if (typeFilter === 'administrative') {
+        projects = projects.filter(p => p.project_type === 'administrative' || p.project_type === 'dual')
+      }
+    }
 
     // ── Projects stats ──────────────────────────────────────────────
     const byStatus   = { active: 0, completed: 0, archived: 0 }
