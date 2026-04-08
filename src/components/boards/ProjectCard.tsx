@@ -3,7 +3,7 @@ import type { Project, ProjectFlow, User } from '../../types/database.types'
 import { getAvatarColor, getInitials, PRIORITY_COLORS, AREA_COLORS } from '../../lib/constants'
 
 interface ProjectWithArea extends Project {
-  requests?: { requester_area: string; request_number?: string } | null
+  requests?: { requester_area: string; requester_name?: string; request_number?: string } | null
 }
 
 interface Props {
@@ -39,6 +39,8 @@ function getSlaTargetBadge(slaTargetDate?: string | null) {
 
 export default function ProjectCard({ project, flow, onClick, users = [], onAssign, selected, onSelect }: Props) {
   const area = project.requests?.requester_area
+  const requesterName = project.requests?.requester_name
+  const showRequester = requesterName && requesterName !== '—'
   const requestNumber = project.requests?.request_number ?? project.project_number
   const areaColorClass = area ? (AREA_COLORS[area] ?? 'bg-gray-100 text-gray-600') : ''
   const dueBadge = getDueDateBadge(project.due_date)
@@ -106,6 +108,11 @@ export default function ProjectCard({ project, flow, onClick, users = [], onAssi
         {area && (
           <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${areaColorClass}`}>
             {area}
+          </span>
+        )}
+        {showRequester && (
+          <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+            👤 {requesterName}
           </span>
         )}
         {project.project_type === 'dual' && (
