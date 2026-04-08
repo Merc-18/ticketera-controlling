@@ -44,6 +44,7 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, onDele
     start_date: project.start_date ?? '',
     due_date: project.due_date ?? '',
     requester_area: project.requests?.requester_area ?? '',
+    requester_name: project.requests?.requester_name ?? '',
   })
 
   const [blockReason, setBlockReason] = useState(project.blocked_reason ?? '')
@@ -99,19 +100,24 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, onDele
         start_date: editData.start_date || undefined,
         due_date: editData.due_date || undefined,
       })
-      // Update requester_area on the linked request if it changed
-      if (project.request_id && editData.requester_area !== (project.requests?.requester_area ?? '')) {
+      // Update request fields (area + requester name) if changed
+      const areaChanged = editData.requester_area !== (project.requests?.requester_area ?? '')
+      const nameChanged = editData.requester_name !== (project.requests?.requester_name ?? '')
+      if (project.request_id && (areaChanged || nameChanged)) {
         await supabase
           .from('requests')
-          .update({ requester_area: editData.requester_area })
+          .update({
+            ...(areaChanged && { requester_area: editData.requester_area }),
+            ...(nameChanged  && { requester_name: editData.requester_name }),
+          })
           .eq('id', project.request_id)
-      } else if (!project.request_id && editData.requester_area) {
+      } else if (!project.request_id && (editData.requester_area || editData.requester_name.trim())) {
         // No linked request yet — create a stub and link it
         const { data: stubRequest } = await supabase
           .from('requests')
           .insert([{
             request_number: project.project_number ?? project.id.slice(0, 8),
-            requester_name: project.requests?.requester_name || '—',
+            requester_name: editData.requester_name.trim() || '—',
             requester_area: editData.requester_area,
             request_type: 'INT',
             origin: 'Interno',
@@ -257,11 +263,22 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, onDele
                   🏷️ {requestType}
                 </span>
               )}
-              {project.requests?.requester_name && (
+              {editMode ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-500">👤</span>
+                  <input
+                    type="text"
+                    value={editData.requester_name}
+                    onChange={e => setEditData(prev => ({ ...prev, requester_name: e.target.value }))}
+                    placeholder="Solicitante..."
+                    className="px-2 py-0.5 rounded-full text-xs font-medium border border-gray-300 bg-white outline-none focus:ring-2 focus:ring-primary w-36"
+                  />
+                </div>
+              ) : project.requests?.requester_name && project.requests.requester_name !== '—' ? (
                 <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
                   👤 {project.requests.requester_name}
                 </span>
-              )}
+              ) : null}
               {project.project_type === 'dual' && (
                 <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
                   DUAL FLOW
@@ -650,7 +667,7 @@ export default function ProjectModal({ project, flows, onClose, onUpdate, onDele
                 <button
                   onClick={() => {
                     setEditMode(false)
-                    setEditData({ title: project.title, description: project.description, priority: project.priority, start_date: project.start_date ?? '', due_date: project.due_date ?? '', requester_area: project.requests?.requester_area ?? '' })
+                    setEditData({ title: project.title, description: project.description, priority: project.priority, start_date: project.start_date ?? '', due_date: project.due_date ?? '', requester_area: project.requests?.requester_area ?? '', requester_name: project.requests?.requester_name ?? '' })
                   }}
                   className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300"
                 >
