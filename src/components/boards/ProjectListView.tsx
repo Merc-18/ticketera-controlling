@@ -44,6 +44,8 @@ export default function ProjectListView({ projects, boardType, onProjectClick, s
         {items.map(({ project, flow }) => {
           const area = project.requests?.requester_area
           const areaColorClass = area ? (AREA_COLORS[area] ?? 'bg-gray-100 text-gray-600') : ''
+          const requesterName = project.requests?.requester_name
+          const showRequester = requesterName && requesterName !== '—'
 
           return (
             <div
@@ -69,6 +71,11 @@ export default function ProjectListView({ projects, boardType, onProjectClick, s
                 {area && (
                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${areaColorClass}`}>
                     {area}
+                  </span>
+                )}
+                {showRequester && (
+                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                    👤 {requesterName}
                   </span>
                 )}
                 {project.project_type === 'dual' && (
